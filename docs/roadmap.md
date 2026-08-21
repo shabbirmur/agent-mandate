@@ -1,6 +1,20 @@
 # Roadmap
 
-## Phase 0 — semantics (current)
+## Current release status
+
+The `v0.1.0` release candidate completes the executable semantics and local
+single-tenant gateway slices, and implements selected ecosystem features such as
+MCP enforcement, RFC 8693 token exchange, OPA boundaries, DPoP hooks, and
+mechanically attenuated delegation. Its providers and payment API remain local
+sandboxes.
+
+The next product milestone is a public interoperability demo using a real
+provider-owned sandbox: one narrowly approved GitHub issue creation succeeds
+once, a prompt-injected destructive repository action is denied, and both
+produce conformance evidence. That milestone does not change the frozen
+`am.action.v1` contract silently.
+
+## Phase 0 — semantics (implemented)
 
 - Executable mandate model with task/audience/action/resource binding
 - Deterministic equality, numeric ceiling, expiry, approval, use-limit, revocation, and audit behavior
@@ -8,26 +22,34 @@
 
 Exit: contributors can debate a running contract instead of a slide deck.
 
-## Phase 1 — usable local gateway
+## Phase 1 — usable local gateway (core local slice implemented)
 
-- PostgreSQL storage with atomic consumption and tenant isolation
-- Signed, versioned action envelopes and idempotent execution receipts
-- OIDC principal authentication and workload identity adapter
-- Cedar and OPA policy adapters; no home-grown policy language
-- Reverse-proxy and TypeScript SDK enforcement points
-- OpenAPI contract, Docker Compose demo, telemetry/redaction defaults
+- Implemented: PostgreSQL storage with atomic consumption and tenant isolation.
+- Implemented: canonical, versioned action envelopes and idempotent execution
+  receipts.
+- Implemented: OIDC principal authentication and a separate workload identity
+  adapter.
+- Implemented: deterministic local constraints and an optional fail-closed OPA
+  data adapter.
+- Implemented: HTTP and MCP enforcement points, OpenAPI, Docker Compose, and
+  telemetry/redaction defaults.
+- Remaining: Cedar, reverse-proxy, and TypeScript SDK adapters.
 
-Exit: secure a real GitHub or cloud read/write workflow without exposing its credential to the agent.
+Remaining exit work: secure a real GitHub or cloud provider-owned sandbox
+workflow without exposing its credential to the agent.
 
-## Phase 2 — agent ecosystem adapters
+## Phase 2 — agent ecosystem adapters (partially implemented)
 
-- MCP middleware with per-tool action schemas and step-up approval
-- LangGraph, OpenAI Agents SDK, and generic HTTP adapters
-- OAuth protected-resource metadata, RFC 8707 audience binding, RFC 8693 token exchange, and RFC 9396 authorization-detail profile
-- DPoP/mTLS proof-of-possession option
-- Parent/child delegation with mechanically tested attenuation
+- Implemented: typed MCP middleware on the shared execution path with exact
+  step-up approval.
+- Implemented: generic HTTP execution, RFC 8707 audience binding, RFC 8693
+  token exchange, a DPoP proof hook, and mechanically attenuated parent/child
+  delegation.
+- Remaining: LangGraph and OpenAI Agents SDK adapters, OAuth protected-resource
+  metadata, an RFC 9396 authorization-detail profile, and mTLS support.
 
-Exit: two independent integrations and a public interop/conformance suite.
+Remaining exit work: two independent integrations and a public
+interop/conformance suite.
 
 ## Phase 3 — enterprise hardening
 

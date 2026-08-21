@@ -1,6 +1,11 @@
+x-app-build: &app-build
+  context: .
+  args:
+    VCS_REF: ${VCS_REF:-local}
+
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     environment:
       POSTGRES_DB: agent_mandate
       POSTGRES_USER: mandate
@@ -16,7 +21,7 @@ services:
       - mandate-db:/var/lib/postgresql/data
 
   idp:
-    build: .
+    build: *app-build
     command: ["node", "dist/sandbox/idp.js"]
     environment:
       PORT: "9000"
@@ -34,7 +39,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   payment-sandbox:
-    build: .
+    build: *app-build
     command: ["node", "dist/sandbox/payments.js"]
     environment:
       PORT: "9100"
@@ -54,7 +59,7 @@ services:
     security_opt: [no-new-privileges:true]
 
   gateway:
-    build: .
+    build: *app-build
     command: ["sh", "-c", "node dist/storage/migrations.js up && node dist/server.js"]
     environment:
       PORT: "8787"

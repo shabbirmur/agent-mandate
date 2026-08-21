@@ -1,5 +1,7 @@
 # Agent Mandate
 
+[![CI](https://github.com/shabbirmur/agent-mandate/actions/workflows/ci.yml/badge.svg)](https://github.com/shabbirmur/agent-mandate/actions/workflows/ci.yml)
+
 Task-bound authorization infrastructure for AI agents. This repository contains
 a deployable, single-tenant pilot showing that an agent can perform one
 consequential action without receiving a standing downstream credential.
@@ -13,6 +15,23 @@ redacted audit events plus an immutable hash-linked receipt-state chain.
 > The checked-in identity and payment services are local test providers. A real
 > pilot still requires reviewed provider configuration, managed PostgreSQL/TLS,
 > secret management, deployment approval, and an external security review.
+
+The repository is preparing its first `v0.1.0` open-source sandbox release. The
+release is intended for local evaluation, protocol review, and contributions;
+it is not a production security boundary or a managed service.
+
+## Why this exists
+
+Agents are often given credentials that are broader and longer-lived than the
+task they are performing. Agent Mandate turns authority into an explicit,
+revocable object bound to a principal, workload, task, audience, action,
+resource, parameters, expiry, approval, and use budget. The downstream
+credential is exchanged inside the gateway and never returned to the agent.
+
+The `v0.1.0` sandbox demonstrates the narrow consequential-action path and its
+failure modes: exact approval, atomic one-use enforcement, prompt/task drift
+denial, idempotent replay, revocation, ambiguous-timeout reconciliation,
+redacted audit, and hash-linked receipt evidence.
 
 ## Run the complete pilot
 
@@ -76,7 +95,8 @@ discarding the local database; pilot evidence must not be deleted.
 ## Implemented pilot contract
 
 - OIDC JWT validation for the principal: signature, issuer, audience, expiry,
-  exact nonce, bounded clock tolerance, and rotating remote JWKS.
+  bounded clock tolerance, rotating remote JWKS, and an exact sandbox
+  token/header nonce equality check.
 - Separately validated workload JWT deriving tenant, agent, and workload fields;
   request bodies cannot assert trusted identity.
 - Opaque grants stored only as SHA-256 hashes, one-hour maximum TTL, immediate
@@ -104,7 +124,11 @@ discarding the local database; pilot evidence must not be deleted.
 
 `POST /v1/mandates` requires the principal JWT in `Authorization: Bearer`, the
 workload JWT in `x-workload-authorization: Bearer`, and the login nonce in
-`x-oidc-nonce`. The server validates the target agent/workload against the token.
+`x-oidc-nonce`. In this local profile the header must equal the token claim; the
+header is caller supplied and is not server-side login-session or replay
+protection. A real relying-party integration must supply the expected nonce from
+trusted session state. The server validates the target agent/workload against
+the token.
 
 `POST /v1/execute` requires the short-lived mandate grant in
 `Authorization: Bearer` and the workload JWT in `x-workload-authorization`.
@@ -128,6 +152,9 @@ missing configuration and fails readiness while PostgreSQL is unavailable.
 
 - Exactly one configured tenant (`pilot` by default), environment, region,
   principal issuer, workload issuer/adapter, and PostgreSQL primary.
+- The HTTP pilot's nonce header only exercises exact claim comparison. It is not
+  a one-time, server-bound OIDC login nonce and must be replaced by trusted
+  relying-party session state in a real integration.
 - Exactly one approved high-risk action profile and payment downstream audience;
   the Compose issuer/token exchange/payment API are sandboxes, not production
   providers.
@@ -150,7 +177,21 @@ whether an allowed payment is wise or its source data is true.
 - [Deployment, rotation, rollback, recovery, and incidents](docs/deployment-runbook.md)
 - [Pilot evidence template](docs/pilot-evidence-template.md)
 - [Accelerated delivery plan](docs/accelerated-pilot-plan.md)
+- [Roadmap](docs/roadmap.md)
+- [v0.1.0 release notes](docs/release-notes-v0.1.0.md)
+- [Changelog](CHANGELOG.md)
+
+## Contributing and security
+
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing contracts or behavior.
+- Report vulnerabilities using the private process in [SECURITY.md](SECURITY.md),
+  not a public issue.
+- Community participation follows [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ## License
 
 Apache-2.0
+
+`v0.1.0` is distributed as source and local container definitions. The package
+is intentionally marked private; no npm package publication is planned for this
+release.

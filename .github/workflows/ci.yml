@@ -12,16 +12,38 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm audit --omit=dev
+      - name: Scan repository history for secrets
+        run: >-
+          docker run --rm --network none
+          -v "${{ github.workspace }}:/repo:ro"
+          zricethezav/gitleaks:v8.28.0@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854
+          detect --source=/repo --no-banner --redact --log-opts=--all
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
       - run: docker compose build
+        env:
+          VCS_REF: ${{ github.sha }}
+      - name: Export gateway image for scanning
+        run: docker image save -o /tmp/agent-mandate-gateway-image.tar agent-mandate-gateway:latest
+      - name: Scan gateway image for high and critical CVEs
+        run: >-
+          docker run --rm
+          -v /tmp/agent-mandate-gateway-image.tar:/image.tar:ro
+          aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+          image --input /image.tar --scanners vuln
+          --severity HIGH,CRITICAL --exit-code 1 --no-progress
+          --format json --output /dev/null
       - run: docker compose up -d --wait
       - run: npm test
         env:

@@ -1,0 +1,110 @@
+name: Feature request
+description: Propose a bounded capability or compatibility improvement with explicit security invariants.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Agent Mandate intentionally keeps its authority and pilot scope narrow. Describe the problem before proposing a broader contract.
+
+        **Do not disclose suspected vulnerabilities here.** Follow the private reporting instructions in [SECURITY.md](https://github.com/shabbirmur/agent-mandate/security/policy).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the user or operator problem and why the current bounded behavior is insufficient.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Concrete use case
+      description: Identify the principal, workload, consequential action, downstream system, and desired outcome without including sensitive data.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the smallest capability that would address the problem, including what remains out of scope.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contract_surfaces
+    attributes:
+      label: Contract surfaces
+      description: Select every frozen or externally visible surface the proposal could affect.
+      multiple: true
+      options:
+        - No frozen contract change
+        - Identity claims or workload binding
+        - Mandate or delegation schema
+        - Action name, resource selector, or canonical envelope
+        - Approval or policy decision
+        - Error code or HTTP/MCP behavior
+        - Receipt, audit, or evidence field
+        - Persistence or migration semantics
+        - Downstream provider or token exchange
+        - Deployment or operational contract
+    validations:
+      required: true
+
+  - type: textarea
+    id: security_analysis
+    attributes:
+      label: Security and failure analysis
+      description: Explain authority bounds, credential handling, tenant isolation, revocation, replay/idempotency, fail-closed behavior, and ambiguous downstream outcomes as applicable.
+      placeholder: |
+        New authority introduced:
+        How authority remains attenuated:
+        Credential and sensitive-data handling:
+        Failure and retry behavior:
+        Abuse cases and mitigations:
+    validations:
+      required: true
+
+  - type: dropdown
+    id: compatibility
+    attributes:
+      label: Compatibility approach
+      description: How should existing integrations and stored evidence be preserved?
+      options:
+        - Backward-compatible without a contract version change
+        - New explicit contract or envelope version
+        - Migration with rollback and compatibility window
+        - Documentation or tooling only
+        - Unsure; design review required
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_evidence
+    attributes:
+      label: Acceptance criteria and evidence
+      description: List observable allow, deny, concurrency, outage, redaction, migration, or interoperability evidence needed to accept the change.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include operational or integration approaches that avoid widening the authorization contract.
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Proposal checks
+      options:
+        - label: I reviewed the documented pilot limits and searched existing issues.
+          required: true
+        - label: This request contains no credentials, tokens, personal data, or sensitive downstream payloads.
+          required: true
+        - label: This is not an undisclosed vulnerability; vulnerabilities will be reported through SECURITY.md.
+          required: true
