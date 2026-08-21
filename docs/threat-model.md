@@ -23,4 +23,10 @@ Downstream credentials, user data, mutation authority, approval integrity, polic
 
 Authorization cannot determine whether an allowed action is wise or whether source data is true. It reduces blast radius and preserves intent. Sandboxing, content provenance, transaction validation, monitoring, recovery, and human operations remain necessary.
 
-The current prototype uses in-memory state and bearer grants. It is demonstrative only and intentionally marked unsafe for production.
+The production server path uses PostgreSQL, hashed opaque bearer grants, atomic
+consumption, and immutable hash-linked evidence events. `src/broker.ts` remains
+only as a fast in-memory conformance implementation. Bearer theft, host/database
+administrator compromise, and signing-key compromise remain outside the pilot's
+full protection boundary; use the DPoP hook where the downstream ecosystem
+supports sender-constrained credentials and complete an external security review
+before production use.

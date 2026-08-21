@@ -1,0 +1,95 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: agent_mandate
+      POSTGRES_USER: mandate
+      POSTGRES_PASSWORD: local-postgres-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mandate -d agent_mandate"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - mandate-db:/var/lib/postgresql/data
+
+  idp:
+    build: .
+    command: ["node", "dist/sandbox/idp.js"]
+    environment:
+      PORT: "9000"
+      ISSUER: http://idp:9000
+    ports:
+      - "127.0.0.1:9000:9000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  payment-sandbox:
+    build: .
+    command: ["node", "dist/sandbox/payments.js"]
+    environment:
+      PORT: "9100"
+      DOWNSTREAM_AUDIENCE: https://payments.sandbox
+      TOKEN_EXCHANGE_CLIENT_ID: agent-mandate
+      TOKEN_EXCHANGE_CLIENT_SECRET: local-only-secret
+    ports:
+      - "127.0.0.1:9100:9100"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9100/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  gateway:
+    build: .
+    command: ["sh", "-c", "node dist/storage/migrations.js up && node dist/server.js"]
+    environment:
+      PORT: "8787"
+      DATABASE_URL: postgres://mandate:local-postgres-only@postgres:5432/agent_mandate
+      OIDC_ISSUER: http://idp:9000
+      OIDC_AUDIENCE: agent-mandate-control
+      OIDC_JWKS_URL: http://idp:9000/jwks.json
+      WORKLOAD_ISSUER: http://idp:9000
+      WORKLOAD_AUDIENCE: agent-mandate-gateway
+      WORKLOAD_JWKS_URL: http://idp:9000/jwks.json
+      DOWNSTREAM_AUDIENCE: https://payments.sandbox
+      TOKEN_EXCHANGE_URL: http://payment-sandbox:9100/oauth/token
+      TOKEN_EXCHANGE_CLIENT_ID: agent-mandate
+      TOKEN_EXCHANGE_CLIENT_SECRET: local-only-secret
+      DOWNSTREAM_URL: http://payment-sandbox:9100
+      REQUEST_TIMEOUT_MS: "2000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      idp:
+        condition: service_healthy
+      payment-sandbox:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8787:8787"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8787/readyz"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  mandate-db:
