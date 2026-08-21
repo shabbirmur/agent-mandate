@@ -1,15 +1,15 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { Pool } from "pg";
+import type { Pool } from "pg";
+import { loadDatabaseTimeoutMs } from "../config.js";
+import { createPostgresPool, withPostgresTransaction } from "./pool.js";
 
 const MIGRATION_NAME = /^\d+_[a-z0-9_]+\.up\.sql$/;
 
 /** Apply each checked-in up migration exactly once under a database lock. */
 export async function applyMigrations(pool: Pool, directory = path.resolve(process.cwd(), "migrations")): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  await withPostgresTransaction(pool, async (client) => {
     await client.query("SELECT pg_advisory_xact_lock($1)", [1_836_279_316]);
     await client.query(`
       CREATE TABLE IF NOT EXISTS agent_mandate_schema_migrations (
@@ -27,13 +27,7 @@ export async function applyMigrations(pool: Pool, directory = path.resolve(proce
       await client.query(sql);
       await client.query("INSERT INTO agent_mandate_schema_migrations (name) VALUES ($1)", [name]);
     }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 /**
@@ -41,13 +35,10 @@ export async function applyMigrations(pool: Pool, directory = path.resolve(proce
  * own evidence-retention guard; populated pilot schemas intentionally fail.
  */
 export async function revertMigrations(pool: Pool, directory = path.resolve(process.cwd(), "migrations")): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  await withPostgresTransaction(pool, async (client) => {
     await client.query("SELECT pg_advisory_xact_lock($1)", [1_836_279_316]);
     const table = await client.query("SELECT to_regclass('agent_mandate_schema_migrations') AS name");
     if (table.rows[0]?.name === null) {
-      await client.query("COMMIT");
       return;
     }
 
@@ -61,13 +52,7 @@ export async function revertMigrations(pool: Pool, directory = path.resolve(proc
       await client.query(sql);
       await client.query("DELETE FROM agent_mandate_schema_migrations WHERE name = $1", [row.name]);
     }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  });
 }
 
 async function runCli(): Promise<void> {
@@ -75,7 +60,9 @@ async function runCli(): Promise<void> {
   if (command !== "up" && command !== "down") throw new Error("usage: migrations.js <up|down>");
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is required");
-  const pool = new Pool({ connectionString });
+  const pool = createPostgresPool(connectionString, loadDatabaseTimeoutMs(), () => {
+    process.stderr.write(`${JSON.stringify({ level: "error", event: "postgres.idle_client_error" })}\n`);
+  });
   try {
     if (command === "up") await applyMigrations(pool);
     else await revertMigrations(pool);

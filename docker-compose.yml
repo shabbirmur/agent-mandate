@@ -59,6 +59,7 @@ services:
     environment:
       PORT: "8787"
       DATABASE_URL: postgres://mandate:local-postgres-only@postgres:5432/agent_mandate
+      DATABASE_TIMEOUT_MS: "1000"
       OIDC_ISSUER: http://idp:9000
       OIDC_AUDIENCE: agent-mandate-control
       OIDC_JWKS_URL: http://idp:9000/jwks.json

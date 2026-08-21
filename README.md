@@ -44,10 +44,11 @@ LOAD_REQUESTS=500 LOAD_CONCURRENCY=10 npm run test:load
 ```
 
 Run the stateful confidence drill. It verifies revocation and successful-receipt
-replay before and after a gateway restart, then stops PostgreSQL long enough to
-observe liveness 200 and readiness 503 repeatedly, verify the gateway container
-did not restart, require a consequential action to fail closed, restore
-PostgreSQL, and verify persisted and fresh-write behavior:
+replay before and after a gateway restart, then pauses PostgreSQL long enough to
+hold established connections open while observing liveness 200 and bounded
+readiness 503 responses repeatedly. It verifies the gateway container did not
+restart, requires a consequential action to fail closed, unpauses PostgreSQL,
+and verifies persisted and fresh-write behavior:
 
 ```bash
 npm run test:confidence
@@ -64,10 +65,10 @@ SOAK_DURATION_SECONDS=3600 SOAK_ACTIONS_PER_SECOND=2 \
   npm run test:soak
 ```
 
-The confidence drill intentionally restarts local Compose services and performs
-a graceful stop/start of one PostgreSQL container. It does not claim crash or
-managed-database failover: run abrupt-failure, provider-owned failover, and
-backup/restore exercises before a real pilot.
+The confidence drill intentionally restarts the local gateway and pauses then
+unpauses one PostgreSQL container to freeze established connections. It does not
+claim PostgreSQL process restart, crash, or managed-database failover: run those
+and provider-owned backup/restore exercises before a real pilot.
 
 Stop the stack with `docker compose down`. Add `-v` only when intentionally
 discarding the local database; pilot evidence must not be deleted.

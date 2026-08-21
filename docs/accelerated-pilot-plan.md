@@ -108,9 +108,10 @@ No workstream may silently redefine identity claims, action names, resource sele
 - CI is configured to run shortened confidence and soak gates—including an
   accelerated token-refresh cycle—on every push and pull request.
 
-These local drills validate the gateway's recovery behavior against a graceful
-stop/start of one PostgreSQL container and retained volume. Abrupt failure,
-managed-primary failover,
+These local drills validate the gateway's bounded failure and recovery behavior
+while one PostgreSQL container is paused with its established connections and
+retained volume. PostgreSQL process restart, abrupt failure, managed-primary
+failover,
 provider-owned backup/restore, a multi-hour accepted soak, and pilot-owner
 sign-off still require the selected deployment environment.
 

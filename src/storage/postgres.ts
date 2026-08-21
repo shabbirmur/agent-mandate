@@ -21,6 +21,7 @@ import {
   type ReceiptOutcome,
 } from "../types.js";
 import { computeReceiptIntegrityHash, isSha256Base64Url, verifyGrantSecret } from "./integrity.js";
+import { withPostgresTransaction } from "./pool.js";
 
 const AUDIT_TYPES = new Set<AuditEvent["type"]>([
   "mandate.issued",
@@ -556,18 +557,7 @@ export class PostgresMandateRepository implements MandateRepository {
   }
 
   async #transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
-    const client = await this.#pool.connect();
-    try {
-      await client.query("BEGIN");
-      const result = await work(client);
-      await client.query("COMMIT");
-      return result;
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
+    return withPostgresTransaction(this.#pool, work);
   }
 }
 

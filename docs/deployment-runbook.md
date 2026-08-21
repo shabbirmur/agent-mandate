@@ -10,6 +10,9 @@ Set secrets outside source control and replace every `local-*` Compose value for
 a shared environment. Required settings are:
 
 - PostgreSQL `DATABASE_URL` with TLS enforced by the platform.
+- PostgreSQL `DATABASE_TIMEOUT_MS` (100-1500 ms), a total readiness budget split
+  between pool acquisition and query execution so their sequential worst case
+  remains below the external probe timeout.
 - OIDC and workload issuer, audience, and JWKS URLs.
 - Token-exchange endpoint, client ID, and client secret.
 - Exact downstream audience and API base URL.
@@ -99,13 +102,14 @@ For the local Compose environment, run the automated stateful drill:
 npm run test:confidence
 ```
 
-It restarts the gateway, gracefully stops and starts PostgreSQL without deleting
-the named volume, repeatedly checks liveness/readiness, verifies no hidden
-gateway restart, requires consequential authorization to fail closed during the
-outage, and verifies persisted replay, revocation, and fresh writes after
-recovery. A passing local drill is not evidence of abrupt process failure,
-managed-primary promotion, connection-string rotation, DNS convergence, or
-provider backup restoration; exercise those separately in the chosen platform.
+It restarts the gateway, pauses and unpauses PostgreSQL without deleting the
+named volume, repeatedly checks liveness/readiness against established
+connections, verifies no hidden gateway restart, requires consequential
+authorization to fail closed during the pause, and verifies persisted replay,
+revocation, and fresh writes after recovery. A passing local drill is not
+evidence of PostgreSQL process restart, abrupt process failure, managed-primary
+promotion, connection-string rotation, DNS convergence, or provider backup
+restoration; exercise those separately in the chosen platform.
 
 ## Confidence-window soak
 

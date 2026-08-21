@@ -1,5 +1,4 @@
 import { createServer } from "node:http";
-import { Pool } from "pg";
 import { createRequestHandler } from "./app.js";
 import { loadConfig } from "./config.js";
 import { HttpDownstreamExecutor, HttpTokenExchangeAdapter } from "./downstream/index.js";
@@ -7,12 +6,11 @@ import { ExecutionGateway } from "./gateway/index.js";
 import { MandateService } from "./grants/index.js";
 import { createRemoteJwtKeyResolver, JwtWorkloadAuthenticator, OidcPrincipalAuthenticator } from "./identity/index.js";
 import { FailClosedPolicyAdapter, OpaPolicyAdapter } from "./policy/index.js";
-import { PostgresMandateRepository } from "./storage/index.js";
+import { createPostgresPool, PostgresMandateRepository } from "./storage/index.js";
 import type { DownstreamResult, JsonValue } from "./types.js";
 
 const config = loadConfig();
-const pool = new Pool({ connectionString: config.databaseUrl });
-pool.on("error", () => {
+const pool = createPostgresPool(config.databaseUrl, config.databaseTimeoutMs, () => {
   process.stderr.write(`${JSON.stringify({ level: "error", event: "postgres.idle_client_error" })}\n`);
 });
 const repository = new PostgresMandateRepository(pool);
