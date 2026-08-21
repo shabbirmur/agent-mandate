@@ -1,0 +1,352 @@
+openapi: 3.1.0
+info:
+  title: Agent Mandate pilot API
+  version: 1.0.0
+  description: Single-tenant pilot profile. Identity fields are derived from validated tokens.
+servers:
+  - url: http://127.0.0.1:8787
+paths:
+  /healthz:
+    get:
+      operationId: liveness
+      responses:
+        "200":
+          description: Process is alive
+  /readyz:
+    get:
+      operationId: readiness
+      responses:
+        "200":
+          description: Gateway and PostgreSQL are ready
+        "503":
+          description: A required dependency is unavailable
+  /v1/mandates:
+    post:
+      operationId: createMandate
+      security:
+        - oidcBearer: []
+          workloadBearer: []
+      parameters:
+        - $ref: "#/components/parameters/WorkloadAuthorization"
+        - $ref: "#/components/parameters/OidcNonce"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MandateCreation"
+      responses:
+        "201":
+          description: Mandate created; the grant is returned exactly once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssuedMandate"
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /v1/execute:
+    post:
+      operationId: executeAction
+      description: Authorizes and executes the approved action without returning the downstream credential.
+      security:
+        - mandateGrant: []
+          workloadBearer: []
+      parameters:
+        - $ref: "#/components/parameters/WorkloadAuthorization"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionExecution"
+      responses:
+        "200":
+          description: Existing idempotent or newly successful execution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecuteResult"
+        "202":
+          description: Downstream outcome is ambiguous and requires reconciliation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecuteResult"
+        "400": { $ref: "#/components/responses/ExecutionResultOrError" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/ExecutionResultOrError" }
+        "409": { $ref: "#/components/responses/ExecutionResultOrError" }
+        "502": { $ref: "#/components/responses/ExecutionResultOrError" }
+        "503": { $ref: "#/components/responses/ExecutionResultOrError" }
+  /v1/mandates/{mandateId}/revoke:
+    post:
+      operationId: revokeMandate
+      security:
+        - oidcBearer: []
+      parameters:
+        - name: mandateId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Revocation state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { revoked: { type: boolean } }
+                required: [revoked]
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /v1/audit:
+    get:
+      operationId: listAudit
+      security:
+        - oidcBearer: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+      responses:
+        "200":
+          description: Tenant-scoped, redacted audit events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/AuditEvent" }
+                required: [events]
+components:
+  securitySchemes:
+    oidcBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    mandateGrant:
+      type: http
+      scheme: bearer
+      description: Short-lived opaque mandate grant; never a downstream credential.
+    workloadBearer:
+      type: apiKey
+      in: header
+      name: x-workload-authorization
+  parameters:
+    WorkloadAuthorization:
+      name: x-workload-authorization
+      in: header
+      required: true
+      schema: { type: string, pattern: '^Bearer .+$' }
+    OidcNonce:
+      name: x-oidc-nonce
+      in: header
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 256 }
+  responses:
+    Error:
+      description: Stable fail-closed error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string }
+              decisionId: { type: string, format: uuid }
+            required: [error]
+            additionalProperties: false
+    ExecutionResultOrError:
+      description: Fail-closed execution decision or request-boundary error
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/ExecuteResult"
+              - type: object
+                properties: { error: { type: string } }
+                required: [error]
+                additionalProperties: false
+  schemas:
+    JsonPrimitive:
+      oneOf:
+        - { type: string }
+        - { type: number }
+        - { type: boolean }
+        - { type: "null" }
+    Parameters:
+      type: object
+      additionalProperties: true
+    Constraints:
+      type: object
+      properties:
+        maxCalls: { type: integer, minimum: 1 }
+        equals:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/JsonPrimitive" }
+        maximum:
+          type: object
+          additionalProperties: { type: number }
+      additionalProperties: false
+    ApprovedEnvelope:
+      type: object
+      properties:
+        version: { type: string, const: am.action.v1 }
+        audience: { type: string, format: uri }
+        action: { type: string, const: payment.create }
+        resource: { type: string, pattern: '^payment:' }
+        parameters: { $ref: "#/components/schemas/Parameters" }
+      required: [version, audience, action, resource, parameters]
+      additionalProperties: false
+    MandateCreation:
+      type: object
+      properties:
+        agentId: { type: string, minLength: 1 }
+        workloadId: { type: string, minLength: 1 }
+        taskId: { type: string, minLength: 1 }
+        audience: { type: string, format: uri }
+        actions:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string }
+        resources:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string }
+        expiresInSeconds: { type: integer, minimum: 1, maximum: 3600 }
+        constraints: { $ref: "#/components/schemas/Constraints" }
+        approval:
+          type: object
+          properties:
+            required: { type: boolean }
+            approvedEnvelope: { $ref: "#/components/schemas/ApprovedEnvelope" }
+          required: [required]
+          additionalProperties: false
+        parentMandateId: { type: string, format: uuid }
+      required: [agentId, workloadId, taskId, audience, actions, resources, expiresInSeconds]
+      additionalProperties: false
+    Mandate:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        principalId: { type: string }
+        agentId: { type: string }
+        workloadId: { type: string }
+        taskId: { type: string }
+        audience: { type: string, format: uri }
+        actions:
+          type: array
+          items: { type: string }
+        resources:
+          type: array
+          items: { type: string }
+        expiresInSeconds: { type: integer, minimum: 1, maximum: 3600 }
+        constraints: { $ref: "#/components/schemas/Constraints" }
+        approval:
+          type: object
+          properties:
+            required: { type: boolean }
+            approvedBy: { type: string }
+            approvedAt: { type: string, format: date-time }
+            envelopeHash: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+          required: [required]
+          additionalProperties: false
+        parentMandateId: { type: string, format: uuid }
+        issuedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        status: { type: string, enum: [active, revoked] }
+        successfulUses: { type: integer, minimum: 0 }
+      required: [id, tenantId, principalId, agentId, workloadId, taskId, audience, actions, resources, expiresInSeconds, issuedAt, expiresAt, status, successfulUses]
+      additionalProperties: false
+    IssuedMandate:
+      type: object
+      properties:
+        mandate: { $ref: "#/components/schemas/Mandate" }
+        grant: { type: string, writeOnly: true }
+      required: [mandate, grant]
+      additionalProperties: false
+    ActionExecution:
+      type: object
+      properties:
+        taskId: { type: string, minLength: 1 }
+        audience: { type: string, format: uri }
+        action: { type: string }
+        resource: { type: string }
+        parameters: { $ref: "#/components/schemas/Parameters" }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 200 }
+      required: [taskId, audience, action, resource, parameters, idempotencyKey]
+      additionalProperties: false
+    Decision:
+      type: object
+      properties:
+        allowed: { type: boolean }
+        code: { type: string }
+        decisionId: { type: string, format: uuid }
+        mandateId: { type: string, format: uuid }
+        envelopeHash: { type: string }
+        remainingCalls: { type: integer, minimum: 0 }
+      required: [allowed, code, decisionId]
+    Receipt:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        mandateId: { type: string, format: uuid }
+        decisionId: { type: string, format: uuid }
+        principalId: { type: string }
+        agentId: { type: string }
+        workloadId: { type: string }
+        taskId: { type: string }
+        audience: { type: string }
+        action: { type: string }
+        resource: { type: string }
+        envelopeVersion: { type: string, const: am.action.v1 }
+        envelopeHash: { type: string }
+        idempotencyKey: { type: string }
+        outcome: { type: string, enum: [pending, succeeded, failed, ambiguous] }
+        downstreamStatus: { type: integer }
+        resultHash: { type: string }
+        previousReceiptHash: { type: string }
+        receiptHash: { type: string }
+        attemptCount: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, tenantId, mandateId, decisionId, principalId, agentId, workloadId, taskId, audience, action, resource, envelopeVersion, envelopeHash, idempotencyKey, outcome, receiptHash, attemptCount, createdAt, updatedAt]
+    ExecuteResult:
+      type: object
+      properties:
+        decision: { $ref: "#/components/schemas/Decision" }
+        receipt: { $ref: "#/components/schemas/Receipt" }
+        result:
+          type: object
+          properties:
+            status: { type: integer }
+            body: {}
+          required: [status, body]
+      required: [decision]
+    AuditEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        at: { type: string, format: date-time }
+        type: { type: string }
+        code: { type: string }
+        mandateId: { type: string }
+        decisionId: { type: string }
+        principalId: { type: string }
+        agentId: { type: string }
+        workloadId: { type: string }
+        taskId: { type: string }
+        audience: { type: string }
+        action: { type: string }
+        resource: { type: string }
+        envelopeHash: { type: string }
+        idempotencyKey: { type: string }
+      required: [id, tenantId, at, type, code]
+      additionalProperties: false

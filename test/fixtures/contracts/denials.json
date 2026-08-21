@@ -1,0 +1,9 @@
+{
+  "taskDrift": { "taskId": "task:prompt-injected" },
+  "audienceDrift": { "audience": "https://attacker.example" },
+  "replay": { "idempotencyKey": "idem-allow-42" },
+  "expired": { "expiresInSeconds": 1 },
+  "revoked": { "status": "revoked" },
+  "parameterMutation": { "parameters": { "amount": 481, "currency": "USD", "recipient": "merchant:42" } },
+  "downstreamTimeout": { "mode": "timeout", "expectedOutcome": "ambiguous" }
+}

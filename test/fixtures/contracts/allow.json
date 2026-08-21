@@ -1,0 +1,8 @@
+{
+  "taskId": "task:pay-42",
+  "audience": "https://payments.sandbox",
+  "action": "payment.create",
+  "resource": "payment:42",
+  "parameters": { "amount": 480, "currency": "USD", "recipient": "merchant:42" },
+  "idempotencyKey": "idem-allow-42"
+}

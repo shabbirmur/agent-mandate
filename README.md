@@ -1,69 +1,128 @@
 # Agent Mandate
 
-Task-bound authorization infrastructure for AI agents.
+Task-bound authorization infrastructure for AI agents. This repository contains
+a deployable, single-tenant pilot showing that an agent can perform one
+consequential action without receiving a standing downstream credential.
 
-Agents should not receive a user's long-lived credential and inherit everything that credential can do. Agent Mandate turns a specific human or service mandate into short-lived authority bound to one agent, one task, one audience, explicit actions and resources, deterministic constraints, revocation, and an audit trail.
+The gateway binds a validated human principal and workload identity to one task,
+audience, action, resource, canonical parameter envelope, expiry, approval, and
+use budget. PostgreSQL atomically enforces use/revocation/idempotency and stores
+redacted audit events plus an immutable hash-linked receipt-state chain.
 
-> Status: pre-alpha reference implementation. Do not use this in production. The in-memory broker and opaque bearer grants exist to make the authorization semantics executable; durable storage, proof-of-possession, standards adapters, and security review are still required.
+> Pilot status: suitable for a controlled sandbox evaluation, not production.
+> The checked-in identity and payment services are local test providers. A real
+> pilot still requires reviewed provider configuration, managed PostgreSQL/TLS,
+> secret management, deployment approval, and an external security review.
 
-## The exact problem
+## Run the complete pilot
 
-OAuth answers whether a client may access a resource server. Workload identity answers which process is calling. Policy engines answer whether attributes satisfy a rule. Agent systems still need a common control plane that assembles those primitives around a delegated task:
-
-- Which principal authorized this agent instance?
-- Is this action part of the approved task, or has the agent drifted?
-- Is authority bound to the exact tool, API audience, object, amount, recipient, and time window?
-- Can a high-risk mutation require approval without granting broad standing access?
-- Can downstream systems verify the decision and can operators reconstruct what happened?
-
-Agent Mandate is the policy enforcement and evidence layer between an agent runtime and tools. It does not infer whether behavior is malicious. It denies actions that fail deterministic, pre-authorized constraints.
-
-## Five-minute demo
+Requirements: Docker Compose v2. The images use Node 22 and PostgreSQL 17.
 
 ```bash
-npm install
+docker compose build
+docker compose up -d --wait
+npm run test:docker
+```
+
+The live test obtains separately signed principal and workload tokens, issues an
+exactly approved `payment.create` mandate, denies prompt-injected task drift and
+parameter mutation, executes through token exchange and the payment sandbox,
+verifies idempotent replay, races a one-use mandate concurrently, and proves an
+unresolved downstream timeout is `ambiguous` rather than blindly repeated.
+
+Run every PostgreSQL concurrency/migration test against the Compose database:
+
+```bash
+TEST_DATABASE_URL=postgres://mandate:local-postgres-only@127.0.0.1:55432/agent_mandate npm test
+```
+
+Run the bounded local load check (defaults to 50 actions at concurrency 5):
+
+```bash
+npm run test:load
+LOAD_REQUESTS=500 LOAD_CONCURRENCY=10 npm run test:load
+```
+
+Stop the stack with `docker compose down`. Add `-v` only when intentionally
+discarding the local database; pilot evidence must not be deleted.
+
+## Implemented pilot contract
+
+- OIDC JWT validation for the principal: signature, issuer, audience, expiry,
+  exact nonce, bounded clock tolerance, and rotating remote JWKS.
+- Separately validated workload JWT deriving tenant, agent, and workload fields;
+  request bodies cannot assert trusted identity.
+- Opaque grants stored only as SHA-256 hashes, one-hour maximum TTL, immediate
+  tenant-scoped revocation, and mechanically attenuated child grants.
+- Atomic parent/child call-budget allocation and one-use consumption under
+  PostgreSQL row locks.
+- Canonical `am.action.v1` envelopes and mandatory exact step-up approval for the
+  pilot's high-risk `payment.create` action.
+- Always-on deterministic policy plus an optional fail-closed OPA data adapter.
+- Shared HTTP and typed MCP enforcement pipeline.
+- RFC 8693 token-exchange adapter with RFC 8707 target/returned-audience checks;
+  exchanged credentials stay inside the executor.
+- Optional DPoP execution hook that fails closed if a DPoP credential has no
+  proof generator.
+- Idempotent execution receipts for success, failure, pending recovery, and
+  ambiguous timeout states; replay never repeats a completed or uncertain side
+  effect.
+- Redacted structured request telemetry, tenant-scoped audits, immutable evidence
+  guards, and hash-linked receipt-state events covering outcomes and result hashes.
+- Health/readiness probes, guarded reversible migrations, non-root read-only
+  containers, OpenAPI, CI, deployment/rollback/incident instructions, and live
+  adversarial/load tests.
+
+## Request boundary
+
+`POST /v1/mandates` requires the principal JWT in `Authorization: Bearer`, the
+workload JWT in `x-workload-authorization: Bearer`, and the login nonce in
+`x-oidc-nonce`. The server validates the target agent/workload against the token.
+
+`POST /v1/execute` requires the short-lived mandate grant in
+`Authorization: Bearer` and the workload JWT in `x-workload-authorization`.
+Identity fields in a JSON body are ignored; the gateway constructs them from the
+validated workload context. See [openapi.yaml](openapi.yaml) for the exact API.
+
+## Local development
+
+```bash
+npm ci
+npm run typecheck
 npm test
-npm run dev
+npm run build
 ```
 
-Issue a one-use mandate:
+For a non-Compose server, set every variable validated by `src/config.ts`, run
+`npm run build && npm run migrate`, then `npm start`. The gateway fails startup on
+missing configuration and fails readiness while PostgreSQL is unavailable.
 
-```bash
-curl -s http://127.0.0.1:8787/v1/mandates \
-  -H 'content-type: application/json' \
-  -d '{"principalId":"user:alice","agentId":"agent:travel","taskId":"task:book-42","audience":"https://travel.example","actions":["booking.create"],"resources":["trip:42"],"expiresInSeconds":300,"constraints":{"maxCalls":1,"equals":{"currency":"USD"},"maximum":{"amount":500}},"approval":{"required":true,"approvedBy":"user:alice"}}'
-```
+## Explicit pilot limits
 
-Pass the returned `grant` to `POST /v1/authorize` before executing the side effect. The same grant cannot authorize a different agent, task, audience, action, resource, currency, amount above $500, or a second successful call.
+- Exactly one configured tenant (`pilot` by default), environment, region,
+  principal issuer, workload issuer/adapter, and PostgreSQL primary.
+- Exactly one approved high-risk action profile and payment downstream audience;
+  the Compose issuer/token exchange/payment API are sandboxes, not production
+  providers.
+- No active-active failover, general policy-authoring UI, provider catalog,
+  automatic ambiguous-action retry, secrets vault, WORM export, SCIM/admin RBAC,
+  formal certification, or external penetration test.
+- The local issuer exposes a test-only client-credentials minting endpoint and
+  regenerates its key on restart. Never deploy it as an identity provider.
+- Receipt hashes make database tampering detectable during verification; a
+  production pilot should export evidence to separately controlled immutable
+  storage or sign it with KMS-backed keys.
 
-## Architecture
+Authorization preserves the approved operating envelope; it cannot decide
+whether an allowed payment is wise or its source data is true.
 
-```text
-human / service principal
-          |
-          v
-  mandate + approval -----> Agent Mandate control plane
-                                  | issue narrow grant
-                                  v
-agent runtime ---> tool gateway / sidecar ---> downstream API
-                       |      ^
-                       v      |
-                 authorize decision
-                       |
-                       +----> append-only audit / receipts
-```
+## Operations and design
 
-The model may propose an action. The gateway constructs canonical action attributes. Deterministic policy decides. Only the gateway holds downstream credentials and executes allowed actions.
-
-## Non-goals
-
-- A secrets manager, password manager, identity provider, or card/passport vault
-- A replacement for OAuth/OIDC, SPIFFE/SPIRE, cloud IAM, Cedar, OPA, or OpenFGA
-- An LLM-based hallucination or prompt-injection detector
-- A magical universal agent identity protocol
-- Custom cryptography
-
-See [docs/problem.md](docs/problem.md), [docs/architecture.md](docs/architecture.md), [docs/threat-model.md](docs/threat-model.md), and [docs/roadmap.md](docs/roadmap.md).
+- [Architecture and frozen contract](docs/architecture.md)
+- [Threat model](docs/threat-model.md)
+- [Deployment, rotation, rollback, recovery, and incidents](docs/deployment-runbook.md)
+- [Pilot evidence template](docs/pilot-evidence-template.md)
+- [Accelerated delivery plan](docs/accelerated-pilot-plan.md)
 
 ## License
 

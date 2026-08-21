@@ -1,40 +1,99 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { MandateBroker } from "./broker.js";
-import type { ActionRequest, MandateRequest } from "./types.js";
+import { createServer } from "node:http";
+import { Pool } from "pg";
+import { createRequestHandler } from "./app.js";
+import { loadConfig } from "./config.js";
+import { HttpDownstreamExecutor, HttpTokenExchangeAdapter } from "./downstream/index.js";
+import { ExecutionGateway } from "./gateway/index.js";
+import { MandateService } from "./grants/index.js";
+import { createRemoteJwtKeyResolver, JwtWorkloadAuthenticator, OidcPrincipalAuthenticator } from "./identity/index.js";
+import { FailClosedPolicyAdapter, OpaPolicyAdapter } from "./policy/index.js";
+import { PostgresMandateRepository } from "./storage/index.js";
+import type { DownstreamResult, JsonValue } from "./types.js";
 
-const broker = new MandateBroker();
-const port = Number(process.env.PORT ?? 8787);
+const config = loadConfig();
+const pool = new Pool({ connectionString: config.databaseUrl });
+pool.on("error", () => {
+  process.stderr.write(`${JSON.stringify({ level: "error", event: "postgres.idle_client_error" })}\n`);
+});
+const repository = new PostgresMandateRepository(pool);
+const principalAuthenticator = new OidcPrincipalAuthenticator({
+  issuer: config.oidc.issuer,
+  audience: config.oidc.audience,
+  verificationKey: createRemoteJwtKeyResolver(config.oidc.jwksUrl),
+  algorithms: ["RS256"],
+  clockToleranceSeconds: config.oidc.clockToleranceSeconds,
+});
+const workloadAuthenticator = new JwtWorkloadAuthenticator({
+  issuer: config.workload.issuer,
+  audience: config.workload.audience,
+  verificationKey: createRemoteJwtKeyResolver(config.workload.jwksUrl),
+  algorithms: ["RS256"],
+  clockToleranceSeconds: config.workload.clockToleranceSeconds,
+});
+const remotePolicy = config.opaUrl
+  ? new OpaPolicyAdapter({ url: config.opaUrl, timeoutMs: config.requestTimeoutMs })
+  : undefined;
+const policy = new FailClosedPolicyAdapter(remotePolicy);
+const tokenExchange = new HttpTokenExchangeAdapter({
+  tokenEndpoint: config.tokenExchangeUrl,
+  clientId: config.tokenExchangeClientId,
+  clientSecret: config.tokenExchangeClientSecret,
+  allowedAudiences: [config.downstreamAudience],
+  timeoutMs: config.requestTimeoutMs,
+});
+const downstream = new HttpDownstreamExecutor({
+  url: `${config.downstreamUrl}/payments`,
+  audience: config.downstreamAudience,
+  timeoutMs: config.requestTimeoutMs,
+  buildBody: (envelope) => ({
+    action: envelope.action,
+    resource: envelope.resource,
+    ...envelope.parameters,
+  }),
+  reconcile: async ({ credential, idempotencyKey, signal }) => {
+    const response = await fetch(`${config.downstreamUrl}/payments/by-idempotency/${encodeURIComponent(idempotencyKey)}`, {
+      headers: { authorization: `${credential.tokenType} ${credential.accessToken}` },
+      signal,
+    });
+    if (response.status === 404) return undefined;
+    return { status: response.status, body: await safeJson(response) };
+  },
+});
+const gateway = new ExecutionGateway({ repository, policy, tokenExchange, downstream });
+const mandates = new MandateService(repository, { highRiskActions: ["payment.create"] });
+const server = createServer(createRequestHandler({
+  tenantId: config.tenantId,
+  repository,
+  mandates,
+  gateway,
+  principalAuthenticator,
+  workloadAuthenticator,
+}));
+server.requestTimeout = Math.max(10_000, config.requestTimeoutMs + 2_000);
+server.headersTimeout = 5_000;
+server.keepAliveTimeout = 5_000;
+server.maxHeadersCount = 64;
 
-createServer(async (req, res) => {
-  try {
-    if (req.method === "GET" && req.url === "/healthz") return json(res, 200, { ok: true });
-    if (req.method === "POST" && req.url === "/v1/mandates") {
-      const mandate = broker.issue(await body<MandateRequest>(req));
-      return json(res, 201, { ...mandate, grant: MandateBroker.bearer(mandate), secret: undefined });
-    }
-    if (req.method === "POST" && req.url === "/v1/authorize") {
-      const decision = broker.authorize(await body<ActionRequest>(req));
-      return json(res, decision.allowed ? 200 : 403, decision);
-    }
-    const revoke = req.method === "POST" && req.url?.match(/^\/v1\/mandates\/([^/]+)\/revoke$/);
-    if (revoke) {
-      const revoked = broker.revoke(revoke[1]!);
-      return json(res, revoked ? 200 : 404, { revoked });
-    }
-    if (req.method === "GET" && req.url === "/v1/audit") return json(res, 200, { events: broker.audit() });
-    return json(res, 404, { error: "not_found" });
-  } catch (error) {
-    return json(res, 400, { error: error instanceof Error ? error.message : "bad_request" });
-  }
-}).listen(port, "127.0.0.1", () => console.log(`agent-mandate listening on http://127.0.0.1:${port}`));
+server.listen(config.port, "0.0.0.0", () => {
+  process.stdout.write(`${JSON.stringify({ level: "info", event: "gateway.ready", port: config.port })}\n`);
+});
 
-async function body<T>(req: IncomingMessage): Promise<T> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(Buffer.from(chunk));
-  return JSON.parse(Buffer.concat(chunks).toString("utf8")) as T;
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    server.close(async () => {
+      await repository.close();
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10_000).unref();
+  });
 }
 
-function json(res: ServerResponse, status: number, value: unknown): void {
-  res.writeHead(status, { "content-type": "application/json" });
-  res.end(JSON.stringify(value));
+async function safeJson(response: Response): Promise<JsonValue> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as JsonValue;
+  } catch {
+    return text;
+  }
 }
