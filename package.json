@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "description": "Task-bound authorization broker for AI agents",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/shabbirmur/agent-mandate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shabbirmur/agent-mandate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shabbirmur/agent-mandate/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",

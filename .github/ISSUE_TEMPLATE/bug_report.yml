@@ -1,0 +1,130 @@
+name: Bug report
+description: Report a reproducible defect in the gateway, adapters, evidence, or local sandbox.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve Agent Mandate.
+
+        **Do not disclose suspected vulnerabilities in a public issue.** Follow the private reporting instructions in [SECURITY.md](https://github.com/shabbirmur/agent-mandate/security/policy). Remove credentials, tokens, personal data, approval payloads, and sensitive downstream responses from all fields below.
+
+  - type: dropdown
+    id: environment_scope
+    attributes:
+      label: Environment scope
+      description: Where did you observe the problem?
+      options:
+        - Local Docker Compose sandbox
+        - Local development process
+        - GitHub Actions CI
+        - External non-production sandbox
+        - Pilot or production-like environment
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      description: Select every surface that appears relevant.
+      multiple: true
+      options:
+        - Mandate issuance, delegation, revocation, or budgets
+        - Principal or workload identity validation
+        - Approval envelope or policy enforcement
+        - HTTP gateway
+        - MCP adapter
+        - PostgreSQL, migrations, or receipt evidence
+        - Token exchange or downstream execution
+        - Docker, CI, load, soak, or outage tooling
+        - Documentation or API contract
+        - Unknown
+    validations:
+      required: true
+
+  - type: input
+    id: version_ref
+    attributes:
+      label: Version or source reference
+      description: Provide a release tag or full commit SHA. Do not include a credential-bearing URL.
+      placeholder: v0.1.0 or 137f60278f80adbfea25ea486f7e11fb1cf73df3
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment details
+      description: Include only non-sensitive details needed to reproduce the issue.
+      placeholder: |
+        OS and architecture:
+        Node version:
+        Docker and Compose versions:
+        PostgreSQL version:
+        Relevant non-secret configuration:
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Current behavior
+      description: What happened, including the sanitized error code or failed invariant?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Give the smallest deterministic sequence that reproduces the problem.
+      placeholder: |
+        1. Start from...
+        2. Run...
+        3. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior
+      description: State the expected outcome and the authorization, idempotency, or evidence invariant that should hold.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: contract_impact
+    attributes:
+      label: Frozen-contract impact
+      description: Could this affect identity claims, action names, resource selectors, error codes, envelope versions, or receipt fields?
+      options:
+        - No known contract impact
+        - Possible contract impact
+        - Confirmed contract impact
+        - Unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Add redacted logs, request or receipt identifiers, test output, or a minimal repository. Never attach JWTs, grants, exchanged tokens, secrets, personal data, or unredacted downstream payloads.
+      render: shell
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Reporting checks
+      options:
+        - label: I searched existing issues and reproduced this on the stated source reference.
+          required: true
+        - label: I removed credentials, tokens, personal data, and sensitive payloads from this report.
+          required: true
+        - label: This is not a suspected security vulnerability; vulnerabilities will be reported through SECURITY.md.
+          required: true

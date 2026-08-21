@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Agent Mandate pilot API
-  version: 1.0.0
-  description: Single-tenant pilot profile. Identity fields are derived from validated tokens.
+  version: 0.1.0
+  description: Single-tenant sandbox profile. Identity fields are derived from validated tokens.
 servers:
   - url: http://127.0.0.1:8787
 paths:
@@ -145,6 +145,11 @@ components:
       name: x-oidc-nonce
       in: header
       required: true
+      description: >-
+        Local sandbox equality fixture. It must exactly match the principal
+        token nonce, but it is caller supplied and is not server-bound replay
+        protection. Real integrations must derive the expected nonce from
+        trusted relying-party session state.
       schema: { type: string, minLength: 16, maxLength: 256 }
   responses:
     Error:
