@@ -49,8 +49,9 @@ try {
   await assertRevoked(revocable.grant, revokedInput);
 
   const gatewayBeforeOutage = await inspectGateway();
-  await compose("stop", "postgres");
+  await compose("pause", "postgres");
   await waitForStatus("/readyz", 503);
+  const readinessBurstDurationMs = await requireConcurrentStatuses("/readyz", 503, 20, 1_800);
   const deniedDuringOutage = await execute(outageProbe.grant, outageInput);
   assert.equal(deniedDuringOutage.status, 503, publicFailure(deniedDuringOutage));
   assert.equal(deniedDuringOutage.body.decision?.code ?? deniedDuringOutage.body.error, "policy_indeterminate");
@@ -66,7 +67,7 @@ try {
   const gatewayAfterOutage = await inspectGateway();
   assert.deepEqual(gatewayAfterOutage, gatewayBeforeOutage, "gateway restarted during the database outage");
 
-  await compose("start", "postgres");
+  await compose("unpause", "postgres");
   await waitForStatus("/readyz", 200);
   [principalToken, workloadToken] = await Promise.all([
     issueToken({ token_kind: "principal", tenant_id: "pilot", subject: "user:confidence", audience: "agent-mandate-control", nonce }),
@@ -99,6 +100,9 @@ try {
     successfulReceiptId: firstExecution.body.receipt.id,
     replayPersistedAcrossGatewayRestart: true,
     readinessFailedDuringDatabaseOutage: true,
+    establishedDatabaseConnectionTimedOutWhilePaused: true,
+    saturatedReadinessBurstCount: 20,
+    saturatedReadinessBurstDurationMs: readinessBurstDurationMs,
     consequentialActionFailedClosedDuringDatabaseOutage: true,
     gatewayStayedLiveWithoutRestartDuringObservedOutage: true,
     outageObservationSeconds: outageObservationMs / 1_000,
@@ -113,7 +117,7 @@ try {
   operationError = error;
 } finally {
   try {
-    await composeForCleanup("up", "-d", "--wait", "postgres", "gateway");
+    await composeForCleanup("unpause", "postgres").catch(() => {});
     await waitForStatus("/readyz", 200, 60_000);
   } catch (cleanupError) {
     operationError = operationError
@@ -233,6 +237,23 @@ async function inspectGateway() {
 async function requireStatus(path, expectedStatus) {
   const response = await fetch(`${gatewayUrl}${path}`, { signal: AbortSignal.timeout(Math.min(2_000, remainingMs())) });
   assert.equal(response.status, expectedStatus, `${path} returned ${response.status}`);
+}
+
+async function requireConcurrentStatuses(path, expectedStatus, count, maximumDurationMs) {
+  const startedAt = performance.now();
+  const responses = await Promise.all(
+    Array.from({ length: count }, () =>
+      fetch(`${gatewayUrl}${path}`, { signal: AbortSignal.timeout(Math.min(maximumDurationMs, remainingMs())) }),
+    ),
+  );
+  const durationMs = performance.now() - startedAt;
+  assert.deepEqual(
+    responses.map((response) => response.status),
+    Array.from({ length: count }, () => expectedStatus),
+    `${path} burst did not fail closed`,
+  );
+  assert.ok(durationMs < maximumDurationMs, `${path} burst exceeded ${maximumDurationMs} ms; observed=${durationMs}`);
+  return Math.round(durationMs);
 }
 
 async function issueToken(values) {

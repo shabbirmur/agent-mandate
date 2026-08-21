@@ -20,11 +20,14 @@ const valid = {
 test("loads bounded, explicit pilot configuration", () => {
   const config = loadConfig(valid);
   assert.equal(config.tenantId, "pilot");
+  assert.equal(config.databaseTimeoutMs, 1_000);
   assert.equal(config.requestTimeoutMs, 5_000);
   assert.equal(config.oidc.clockToleranceSeconds, 60);
 });
 
 test("fails fast for missing secrets and invalid bounds", () => {
   assert.throws(() => loadConfig({ ...valid, TOKEN_EXCHANGE_CLIENT_SECRET: "" }), /missing_config/);
+  assert.throws(() => loadConfig({ ...valid, DATABASE_TIMEOUT_MS: "0" }), /invalid_config/);
+  assert.throws(() => loadConfig({ ...valid, DATABASE_TIMEOUT_MS: "2000" }), /invalid_config/);
   assert.throws(() => loadConfig({ ...valid, REQUEST_TIMEOUT_MS: "60000" }), /invalid_config/);
 });

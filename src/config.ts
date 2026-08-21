@@ -1,6 +1,7 @@
 export interface AppConfig {
   port: number;
   databaseUrl: string;
+  databaseTimeoutMs: number;
   tenantId: string;
   oidc: JwtIssuerConfig;
   workload: JwtIssuerConfig;
@@ -27,6 +28,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
   return {
     port: integer(environment.PORT ?? "8787", "PORT", 1, 65_535),
     databaseUrl: required(environment, "DATABASE_URL"),
+    databaseTimeoutMs: loadDatabaseTimeoutMs(environment),
     tenantId: environment.PILOT_TENANT_ID ?? "pilot",
     oidc: {
       issuer: url(required(environment, "OIDC_ISSUER"), "OIDC_ISSUER"),
@@ -49,6 +51,11 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     clockToleranceSeconds,
     ...(opaUrl ? { opaUrl } : {}),
   };
+}
+
+/** Keep database work inside the two-second readiness-probe budget. */
+export function loadDatabaseTimeoutMs(environment: NodeJS.ProcessEnv = process.env): number {
+  return integer(environment.DATABASE_TIMEOUT_MS ?? "1000", "DATABASE_TIMEOUT_MS", 100, 1_500);
 }
 
 function required(environment: NodeJS.ProcessEnv, name: string): string {
