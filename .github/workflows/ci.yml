@@ -10,7 +10,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,9 +28,20 @@ jobs:
           TEST_DATABASE_URL: postgres://mandate:local-postgres-only@127.0.0.1:55432/agent_mandate
       - run: node test/docker-e2e.mjs
       - run: node test/docker-downstream-outage.mjs
+      - run: npm run test:confidence
       - run: npm run test:load
         env:
           LOAD_REQUESTS: "20"
           LOAD_CONCURRENCY: "5"
+      - run: npm run test:soak
+        env:
+          SOAK_DURATION_SECONDS: "10"
+          SOAK_ACTIONS_PER_SECOND: "2"
+          SOAK_CONCURRENCY: "3"
+          SOAK_TOKEN_REFRESH_SECONDS: "3"
+          SOAK_MIN_TOKEN_REFRESHES: "2"
       - if: always()
-        run: docker compose logs --no-color && docker compose down -v
+        continue-on-error: true
+        run: docker compose logs --no-color
+      - if: always()
+        run: docker compose down -v

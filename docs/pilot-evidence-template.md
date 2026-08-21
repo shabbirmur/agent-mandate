@@ -21,7 +21,9 @@
 | Migration rollback/reapply | migration verification | Pending |
 | Secret/PII redaction | redaction tests and sampled logs | Pending |
 | Restart/revocation persistence | Compose recovery test | Pending |
+| PostgreSQL outage liveness/readiness and recovery | `npm run test:confidence` | Pending |
 | Pilot-rate load/soak | load command and summary | Pending |
+| Soak duration, rate, error, p95, scheduler lag, deadline, and token refresh | `npm run test:soak` JSON thresholds/summary | Pending |
 
 ## Residual risks and acceptance
 

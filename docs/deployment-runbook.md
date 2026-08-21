@@ -92,3 +92,35 @@ After process restart, database restore, or failover, verify:
 - the same idempotency key returns its existing receipt;
 - receipt-chain verification succeeds;
 - tenant-scoped audit queries do not return another tenant's records.
+
+For the local Compose environment, run the automated stateful drill:
+
+```bash
+npm run test:confidence
+```
+
+It restarts the gateway, gracefully stops and starts PostgreSQL without deleting
+the named volume, repeatedly checks liveness/readiness, verifies no hidden
+gateway restart, requires consequential authorization to fail closed during the
+outage, and verifies persisted replay, revocation, and fresh writes after
+recovery. A passing local drill is not evidence of abrupt process failure,
+managed-primary promotion, connection-string rotation, DNS convergence, or
+provider backup restoration; exercise those separately in the chosen platform.
+
+## Confidence-window soak
+
+Choose thresholds from the signed pilot operating envelope, then run a soak at
+the expected action rate. For example:
+
+```bash
+SOAK_DURATION_SECONDS=14400 SOAK_ACTIONS_PER_SECOND=2 \
+  SOAK_CONCURRENCY=5 SOAK_MAX_ERROR_RATE=0.001 SOAK_MAX_P95_MS=500 \
+  npm run test:soak
+```
+
+Record the JSON summary, gateway image digest, database version, start/end UTC
+times, and sampled redacted logs. A valid confidence window has no unexplained
+failed actions, remains within the accepted error, latency, sustained-rate, and
+scheduler-lag budgets, exercises token refresh, and is followed by receipt-chain
+verification. Do not raise thresholds after a failed run without pilot-owner
+review.
