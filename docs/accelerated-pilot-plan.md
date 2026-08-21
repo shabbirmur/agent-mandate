@@ -94,6 +94,26 @@ No workstream may silently redefine identity claims, action names, resource sele
 
 **Gate:** pilot owner signs the narrow operating envelope and accepts the residual risks.
 
+#### Implemented confidence-window automation
+
+- `npm run test:confidence` preserves a successful receipt and a revoked
+  mandate across gateway restart and PostgreSQL outage/recovery. During the
+  observed database-outage window it repeatedly requires `/healthz` 200 and
+  `/readyz` 503, verifies the gateway container did not restart, and requires a
+  consequential action to fail closed.
+- `npm run test:soak` drives a configurable expected action rate for up to 24
+  hours, refreshes short-lived principal/workload tokens, reports latency and
+  scheduler-lag summaries, and fails on error, p95, sustained-rate, scheduling,
+  token-refresh, or hard-deadline violations.
+- CI is configured to run shortened confidence and soak gates—including an
+  accelerated token-refresh cycle—on every push and pull request.
+
+These local drills validate the gateway's recovery behavior against a graceful
+stop/start of one PostgreSQL container and retained volume. Abrupt failure,
+managed-primary failover,
+provider-owned backup/restore, a multi-hour accepted soak, and pilot-owner
+sign-off still require the selected deployment environment.
+
 ## Test matrix
 
 ### Unit and contract tests

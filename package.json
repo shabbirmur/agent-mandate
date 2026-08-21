@@ -12,8 +12,10 @@
     "start": "node dist/server.js",
     "test": "node --import tsx --test test/*.test.ts",
     "test:docker": "node test/docker-e2e.mjs",
+    "test:confidence": "node test/docker-confidence.mjs",
     "test:downstream-outage": "node test/docker-downstream-outage.mjs",
     "test:load": "node test/docker-load.mjs",
+    "test:soak": "node test/docker-soak.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "engines": {

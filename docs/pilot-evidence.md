@@ -3,9 +3,9 @@
 This report records observed local evidence for the accelerated implementation.
 It is not production approval or pilot-owner acceptance.
 
-- Source base: `549112502f7468d92106338657e0a0c78f7f1a67` plus the reviewed working-tree implementation in this delivery.
-- Release tag: pending; no tag or commit was created without explicit publication authorization.
-- Gateway image: `sha256:92532b05875ae3bbd297270123b23a335486311cceed16dac348fbcaf6fe3aa8` (`linux/arm64`, local Docker build).
+- Source base: committed pilot merge `8d9df2edcaa7b050584cc5b746c9298a3cbee3cf` plus the confidence-window changes in this evidence commit.
+- Release tag: pending; no release tag has been created for this phase.
+- Gateway image: `sha256:42ed87807827a41e105b13ece90bcaa809ca5366dede48a43bc12fc500222c7e` (`linux/arm64`, local Docker build from the confidence-window change set).
 - Runtime: Node 22 Alpine images; PostgreSQL 17 Alpine; Docker Compose on a single local region/host.
 - Providers: checked-in sandbox OIDC/workload issuer and payment token-exchange/API only.
 
@@ -26,8 +26,10 @@ It is not production approval or pilot-owner acceptance.
 | Downstream outage | Token-exchange outage produced a persisted `failed` receipt; retry after recovery returned the same receipt without executing. |
 | Gateway restart | Container restart returned to healthy and the full E2E suite passed against persisted database state. |
 | PostgreSQL outage/recovery | Initial drill exposed an unhandled pool error and was fixed. Re-run kept the gateway alive with `readyz` HTTP 503; PostgreSQL restart restored healthy state and the full E2E path passed. |
+| Stateful confidence drill | Hardened re-run passed: over a five-second graceful PostgreSQL outage, 20 consecutive probe pairs observed `/healthz` 200 and `/readyz` 503, container ID/start time/PID/restart count stayed unchanged, and a consequential action failed closed with `policy_indeterminate`. Successful replay, pre-outage one-use consumption, and revocation survived gateway restart and database recovery; fresh execution and one-use enforcement succeeded after recovery. |
 | Migration rollback | Empty-schema down migration passed; populated audit/receipt evidence made destructive rollback fail closed. |
 | Bounded load | 100 approved actions at concurrency 10: 160.10 actions/s, p50 51.19 ms, p95 145.17 ms, max 165.88 ms on this local host. |
+| Confidence smoke-soak | Hardened 15-second run passed 30/30 actions at target and observed 2 actions/s, concurrency 3, zero errors, four token renewals after initial acquisition, p50 36.24 ms, p95 46.70 ms, max 67.75 ms, scheduler-lag p95 2.29 ms, and no deadline violation. This validates the runner, not the outstanding multi-hour soak gate. |
 | Redaction | Unit tests passed; sampled gateway logs contained request ID, method, path, status, and duration only—no grants, JWTs, exchanged tokens, parameters, or downstream bodies. |
 
 ## Residual gates
@@ -38,7 +40,9 @@ It is not production approval or pilot-owner acceptance.
 - Managed PostgreSQL backup/restore and platform database failover were not
   exercised locally; only process/container restart and database outage/recovery
   were observed.
-- No multi-hour soak, external penetration test, formal certification, WORM
+- The confidence runner passed a hardened 15-second smoke-soak after independent
+  review. No multi-hour soak,
+  external penetration test, formal certification, WORM
   evidence export, KMS signature, or production deployment was performed.
 - The pilot owner has not signed the operating envelope. Acceptance must name the
   tenant, region, identity/workload issuers, payment audience, action schema,
