@@ -6,6 +6,10 @@ authorization envelope carries its own explicit contract version.
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.1.0 - 2026-08-24
+
 ### Added
 
 - PostgreSQL-backed mandates, revocation, idempotency, delegation budgets,
@@ -23,6 +27,8 @@ authorization envelope carries its own explicit contract version.
 - Apache-2.0 governance files, contribution and security guidance, structured
   issue forms, a release checklist, Dependabot, CodeQL, history secret scanning,
   and high/critical container-CVE scanning.
+- Node 26 Alpine runtime images, `@types/node` 26, TypeScript 7, and the pinned
+  `setup-node` 7 GitHub Action.
 
 ### Security
 
@@ -36,6 +42,6 @@ authorization envelope carries its own explicit contract version.
 
 ### Release status
 
-- `v0.1.0` tag and GitHub release are pending release-candidate review.
+- `v0.1.0` is the first open-source sandbox release.
 - The checked-in providers are local test sandboxes; production and managed
   database acceptance gates remain open.
