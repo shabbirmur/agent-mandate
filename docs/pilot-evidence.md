@@ -6,7 +6,7 @@ It is not production approval or pilot-owner acceptance.
 - Original authorization implementation baseline: `abfa608e8394b52c5824fe68466ed31920049602`.
 - Validated cumulative protected-main base: `66bfe31443e0af2555554df39e5909712e21c366`, including Node 26, `@types/node` 26, TypeScript 7, and `setup-node` 7.
 - Release integration and local-image revision: `c5901de20933238f2f264d26eed231a1c8fb4878`.
-- Release tag: `v0.1.0`; publication and independent archive verification will be recorded in `release-checklist.md` after the immutable tag and GitHub release exist.
+- Release tag: annotated `v0.1.0` at `f0825f84bdc435b81c4a12a467e330225792f5e0`; the [GitHub release](https://github.com/shabbirmur/agent-mandate/releases/tag/v0.1.0) and independent archive verification are complete and recorded in `release-checklist.md`.
 - Gateway image: `sha256:6786252c04899c52f603121057bf90d582835bb9dd105bbfdf81964ae083fa92` (`linux/arm64`, local Node 26 Docker build with OCI revision `c5901de20933238f2f264d26eed231a1c8fb4878`).
 - Runtime: Node 26 Alpine images; PostgreSQL 17 Alpine; Docker Compose on a single local region/host.
 - Providers: checked-in sandbox OIDC/workload issuer and payment token-exchange/API only.
@@ -17,6 +17,8 @@ It is not production approval or pilot-owner acceptance.
 |---|---|
 | Strict compile and production build | Passed: `npm run typecheck`, `npm run build`, and Docker multi-stage build. |
 | Hosted implementation CI | Passed on cumulative protected-main base `66bfe31443e0af2555554df39e5909712e21c366`: [CI run 32756329592](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329592) and [CodeQL run 32756329584](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329584). |
+| Final tag-target CI | Passed on exact tagged main SHA `f0825f84bdc435b81c4a12a467e330225792f5e0`: [CI run 32757385507](https://github.com/shabbirmur/agent-mandate/actions/runs/32757385507) and [CodeQL run 32757385479](https://github.com/shabbirmur/agent-mandate/actions/runs/32757385479). |
+| Published source archives | TAR and ZIP were downloaded independently, matched file-for-file, and passed version/documentation inspection plus Node 26 install, typecheck, unit, build, and isolated Compose E2E. SHA-256: TAR `060123fdb6d8b2c68959e19bcb6bcf88fd66e86be61ba160a65599de05643396`; ZIP `df8db8f201bb510f37fcb22c367c420cd866347ac1038406026c319b78de88b4`. |
 | Supply-chain checks | Implementation CI passed `npm audit --omit=dev`, full-history Gitleaks, and Trivy high/critical image scanning. The 2026-08-24 local dependency recheck reported zero vulnerabilities; distributed dependency licenses are Apache-2.0, ISC, or MIT. |
 | Unit/contract/adversarial suite | Passed all 52 discovered tests when run with PostgreSQL; no failures or skips. This includes bounded-pool configuration and failed-transaction client-disposal coverage. |
 | Live PostgreSQL suite | The same 52/52 run passed migration, tenant, concurrency, replay, revocation, hash-chain tamper, and sibling-delegation cases against PostgreSQL 17. |
