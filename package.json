@@ -31,10 +31,10 @@
     "node": ">=22"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.2.0",
     "@types/pg": "^8.23.1",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "jose": "^6.2.9",
