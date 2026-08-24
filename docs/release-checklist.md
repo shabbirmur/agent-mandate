@@ -27,7 +27,7 @@ Completing the open-source checklist does not satisfy, waive, or imply any produ
 - [x] Evidence verifies exact approval binding, task/audience/parameter drift denial, atomic one-use enforcement, revocation, idempotent replay, ambiguous timeout handling, HTTP/MCP parity, redaction, tenant isolation, and receipt-chain integrity.
 - [x] Migration up/down, restart, PostgreSQL outage/recovery, and downstream outage/recovery evidence is tied to the implementation SHA and dated environment details.
 - [x] `openapi.yaml`, README, architecture, threat model, deployment runbook, pilot evidence, and known limitations agree with observed behavior.
-- [x] The locally rebuilt Node 26 `linux/arm64` gateway image embeds `VCS_REF=c5901de20933238f2f264d26eed231a1c8fb4878` and has digest `sha256:6786252c04899c52f603121057bf90d582835bb9dd105bbfdf81964ae083fa92`. No registry image or SBOM is published for v0.1.0; source-tag and archive linkage will be verified in the publication section below after publication.
+- [x] The locally rebuilt Node 26 `linux/arm64` gateway image embeds `VCS_REF=c5901de20933238f2f264d26eed231a1c8fb4878` and has digest `sha256:6786252c04899c52f603121057bf90d582835bb9dd105bbfdf81964ae083fa92`. No registry image or SBOM is published for v0.1.0; completed source-tag and archive-linkage evidence is recorded in the publication section below.
 
 ### Publish and verify
 
