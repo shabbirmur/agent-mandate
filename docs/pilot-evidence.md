@@ -3,7 +3,9 @@
 This report records observed local and hosted evidence for the accelerated implementation.
 It is not production approval or pilot-owner acceptance.
 
-- Validated implementation base: `abfa608e8394b52c5824fe68466ed31920049602` on protected `main`; the release integration base `c5901de20933238f2f264d26eed231a1c8fb4878` also includes the separately checked Node 26, `@types/node` 26, TypeScript 7, and `setup-node` 7 updates from protected `main`.
+- Original authorization implementation baseline: `abfa608e8394b52c5824fe68466ed31920049602`.
+- Validated cumulative protected-main base: `66bfe31443e0af2555554df39e5909712e21c366`, including Node 26, `@types/node` 26, TypeScript 7, and `setup-node` 7.
+- Release integration and local-image revision: `c5901de20933238f2f264d26eed231a1c8fb4878`.
 - Release tag: `v0.1.0`; publication and independent archive verification will be recorded in `release-checklist.md` after the immutable tag and GitHub release exist.
 - Gateway image: `sha256:6786252c04899c52f603121057bf90d582835bb9dd105bbfdf81964ae083fa92` (`linux/arm64`, local Node 26 Docker build with OCI revision `c5901de20933238f2f264d26eed231a1c8fb4878`).
 - Runtime: Node 26 Alpine images; PostgreSQL 17 Alpine; Docker Compose on a single local region/host.
@@ -14,7 +16,7 @@ It is not production approval or pilot-owner acceptance.
 | Gate | Observed result |
 |---|---|
 | Strict compile and production build | Passed: `npm run typecheck`, `npm run build`, and Docker multi-stage build. |
-| Hosted implementation CI | Passed on the exact validated implementation base: [CI run 32515532638](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532638) and [CodeQL run 32515532631](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532631). A [scheduled CodeQL re-scan](https://github.com/shabbirmur/agent-mandate/actions/runs/32688615047) also passed on 2026-08-24. |
+| Hosted implementation CI | Passed on cumulative protected-main base `66bfe31443e0af2555554df39e5909712e21c366`: [CI run 32756329592](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329592) and [CodeQL run 32756329584](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329584). |
 | Supply-chain checks | Implementation CI passed `npm audit --omit=dev`, full-history Gitleaks, and Trivy high/critical image scanning. The 2026-08-24 local dependency recheck reported zero vulnerabilities; distributed dependency licenses are Apache-2.0, ISC, or MIT. |
 | Unit/contract/adversarial suite | Passed all 52 discovered tests when run with PostgreSQL; no failures or skips. This includes bounded-pool configuration and failed-transaction client-disposal coverage. |
 | Live PostgreSQL suite | The same 52/52 run passed migration, tenant, concurrency, replay, revocation, hash-chain tamper, and sibling-delegation cases against PostgreSQL 17. |
@@ -27,7 +29,7 @@ It is not production approval or pilot-owner acceptance.
 | Ambiguous downstream timeout | First request returned `downstream_ambiguous`; retry returned the same receipt and attempt count without repeating the mutation. |
 | Downstream outage | Token-exchange outage produced a persisted `failed` receipt; retry after recovery returned the same receipt without executing. |
 | Gateway restart | Container restart returned to healthy and the full E2E suite passed against persisted database state. |
-| PostgreSQL outage/recovery | Initial drill exposed an unhandled idle-pool error and was fixed. The first hosted CI confidence run then exposed unbounded PostgreSQL waits under repeated aborted readiness probes. Explicit acquisition, query, and statement timeouts fixed that source path; the local re-run kept the gateway alive with `readyz` HTTP 503, and PostgreSQL recovery restored healthy state and the full E2E path passed. Hosted confirmation is in implementation-base [CI run 32515532638](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532638). |
+| PostgreSQL outage/recovery | Initial drill exposed an unhandled idle-pool error and was fixed. The first hosted CI confidence run then exposed unbounded PostgreSQL waits under repeated aborted readiness probes. Explicit acquisition, query, and statement timeouts fixed that source path; the local re-run kept the gateway alive with `readyz` HTTP 503, and PostgreSQL recovery restored healthy state and the full E2E path passed. Hosted confirmation is in cumulative-base [CI run 32756329592](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329592). |
 | Stateful confidence drill | Hardened re-run passed: while PostgreSQL was paused, a saturated burst of 20 concurrent `/readyz` requests all returned 503 in 621 ms. Over the following five-second window, seven consecutive probe pairs observed `/healthz` 200 and bounded `/readyz` 503 responses; container ID/start time/PID/restart count stayed unchanged, and a consequential action failed closed with `policy_indeterminate`. Successful replay, pre-outage one-use consumption, and revocation survived gateway restart and database recovery; fresh execution and one-use enforcement succeeded after recovery. |
 | Migration rollback | Empty-schema down migration passed; populated audit/receipt evidence made destructive rollback fail closed. |
 | Bounded load | Final Node 26 re-run passed 100 approved actions at concurrency 10: 190.49 actions/s, p50 48.19 ms, p95 98.79 ms, max 120.98 ms on this local host. |

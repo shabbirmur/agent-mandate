@@ -40,9 +40,9 @@ Completing the open-source checklist does not satisfy, waive, or imply any produ
 
 ### Open-source decision record
 
-- Validated implementation commit SHA: `abfa608e8394b52c5824fe68466ed31920049602`
+- Validated cumulative protected-main implementation SHA: `66bfe31443e0af2555554df39e5909712e21c366`
 - Final tag-target SHA: recorded in the annotated tag, GitHub release, and post-publication verification record because a tracked file cannot contain its own commit SHA.
-- CI run URL and result: [CI 32515532638](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532638) passed, including 52/52 PostgreSQL-backed tests with no skips; [CodeQL 32515532631](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532631) passed.
+- CI run URL and result: [CI 32756329592](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329592) passed on the cumulative protected-main base, including 52/52 PostgreSQL-backed tests with no skips; [CodeQL 32756329584](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329584) passed.
 - Evidence report and artifact digests: `docs/pilot-evidence.md`; local Node 26 `linux/arm64` gateway image `sha256:6786252c04899c52f603121057bf90d582835bb9dd105bbfdf81964ae083fa92`. Published source-archive checksums will be recorded with the GitHub release and post-publication verification record.
 - Known residual risks: local test providers, no managed PostgreSQL failover/restore evidence, no multi-hour soak, external security review, production deployment, KMS/WORM evidence, or pilot-owner acceptance.
 - Decision: `GO` for the open-source sandbox release only.

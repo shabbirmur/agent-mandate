@@ -25,9 +25,10 @@ downstream credential.
 
 ## Release evidence
 
-- Validated implementation base `abfa608e8394b52c5824fe68466ed31920049602` passed
-  [hosted CI](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532638)
-  and [CodeQL](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532631).
+- Cumulative protected-main implementation base
+  `66bfe31443e0af2555554df39e5909712e21c366` passed
+  [hosted CI](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329592)
+  and [CodeQL](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329584).
   CI passed typecheck, 52 PostgreSQL-backed tests with no skips, production
   build, full-history secret scanning, high/critical image scanning, Compose
   deployment, adversarial E2E, downstream outage, database-pause confidence,
