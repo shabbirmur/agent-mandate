@@ -32,21 +32,21 @@ Completing the open-source checklist does not satisfy, waive, or imply any produ
 ### Publish and verify
 
 - [x] Release notes summarize security boundaries, user-visible behavior, breaking changes, migration requirements, known limitations, and explicitly deferred production gates.
-- [ ] An immutable annotated `v0.1.0` tag is created from the final documentation commit after its required checks pass; the tag is not moved or reused.
-- [ ] A GitHub release is published from that tag with checksums/digests for additional artifacts and links to the security policy, runbook, evidence, and API contract.
-- [ ] The published source archive is downloaded and its version, checksum, documentation links, and local quick start are verified independently.
-- [ ] Announcement text uses “open-source sandbox release” or equivalent language and does not claim production readiness, certification, external security approval, managed failover, or real-provider acceptance.
-- [ ] If a material release defect is found, the tag is not rewritten; document impact and ship a new patch version. Follow `SECURITY.md` for vulnerabilities.
+- [x] Immutable annotated tag `v0.1.0` was created once at exact green main SHA `f0825f84bdc435b81c4a12a467e330225792f5e0`; the tag has not been moved or reused.
+- [x] The [GitHub release](https://github.com/shabbirmur/agent-mandate/releases/tag/v0.1.0) is published from that tag with a `SHA256SUMS` asset and links to the security policy, runbook, evidence, and API contract.
+- [x] Both published source archives were downloaded independently on 2026-08-24. They matched file-for-file; version `0.1.0`, documentation links, the Node 26 install/typecheck/unit/build path, and an isolated fresh Docker Compose E2E quick start were verified.
+- [x] Release text uses “open-source sandbox release,” states that production/pilot acceptance is not requested, and does not claim production readiness, certification, external security approval, managed failover, or real-provider acceptance.
+- [x] Release policy forbids rewriting `v0.1.0`; any material defect will be documented and corrected in a new patch release, with vulnerabilities handled through `SECURITY.md`.
 
 ### Open-source decision record
 
 - Validated cumulative protected-main implementation SHA: `66bfe31443e0af2555554df39e5909712e21c366`
-- Final tag-target SHA: recorded in the annotated tag, GitHub release, and post-publication verification record because a tracked file cannot contain its own commit SHA.
-- CI run URL and result: [CI 32756329592](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329592) passed on the cumulative protected-main base, including 52/52 PostgreSQL-backed tests with no skips; [CodeQL 32756329584](https://github.com/shabbirmur/agent-mandate/actions/runs/32756329584) passed.
-- Evidence report and artifact digests: `docs/pilot-evidence.md`; local Node 26 `linux/arm64` gateway image `sha256:6786252c04899c52f603121057bf90d582835bb9dd105bbfdf81964ae083fa92`. Published source-archive checksums will be recorded with the GitHub release and post-publication verification record.
+- Final tag-target SHA: `f0825f84bdc435b81c4a12a467e330225792f5e0`.
+- CI run URL and result: final tag-target [CI 32757385507](https://github.com/shabbirmur/agent-mandate/actions/runs/32757385507) and [CodeQL 32757385479](https://github.com/shabbirmur/agent-mandate/actions/runs/32757385479) passed. CI included 52/52 PostgreSQL-backed tests with no skips plus audit, secret scan, image scan, E2E, outage, confidence, load, and soak gates.
+- Evidence report and artifact digests: `docs/pilot-evidence.md`; local Node 26 `linux/arm64` gateway image `sha256:6786252c04899c52f603121057bf90d582835bb9dd105bbfdf81964ae083fa92`; source TAR `sha256:060123fdb6d8b2c68959e19bcb6bcf88fd66e86be61ba160a65599de05643396`; source ZIP `sha256:df8db8f201bb510f37fcb22c367c420cd866347ac1038406026c319b78de88b4`; published [`SHA256SUMS`](https://github.com/shabbirmur/agent-mandate/releases/download/v0.1.0/SHA256SUMS).
 - Known residual risks: local test providers, no managed PostgreSQL failover/restore evidence, no multi-hour soak, external security review, production deployment, KMS/WORM evidence, or pilot-owner acceptance.
 - Decision: `GO` for the open-source sandbox release only.
-- Release approver, date, and planned release URL: Shabbir Murtaza (`@shabbirmur`), 2026-08-24; <https://github.com/shabbirmur/agent-mandate/releases/tag/v0.1.0>.
+- Release approver, date, and release URL: Shabbir Murtaza (`@shabbirmur`), 2026-08-24; <https://github.com/shabbirmur/agent-mandate/releases/tag/v0.1.0>.
 
 ## B. Separate production/pilot acceptance
 

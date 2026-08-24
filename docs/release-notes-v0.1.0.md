@@ -1,6 +1,6 @@
 # Agent Mandate v0.1.0 release notes
 
-Status: approved open-source sandbox release.
+Status: published open-source sandbox release.
 
 `v0.1.0` is the first public sandbox release of Agent Mandate, a task-bound
 authorization gateway for consequential AI-agent actions. It demonstrates that
@@ -33,6 +33,10 @@ downstream credential.
   build, full-history secret scanning, high/critical image scanning, Compose
   deployment, adversarial E2E, downstream outage, database-pause confidence,
   bounded load, and the CI-sized soak gate.
+- Final tagged main SHA `f0825f84bdc435b81c4a12a467e330225792f5e0`
+  passed [post-merge CI](https://github.com/shabbirmur/agent-mandate/actions/runs/32757385507)
+  and [post-merge CodeQL](https://github.com/shabbirmur/agent-mandate/actions/runs/32757385479)
+  before the immutable annotated tag was created.
 
 See [pilot-evidence.md](pilot-evidence.md) for the machine-observed local details
 and their explicit limits. The exact implementation SHA, hosted run URLs, scan
