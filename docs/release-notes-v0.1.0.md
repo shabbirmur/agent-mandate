@@ -1,6 +1,6 @@
 # Agent Mandate v0.1.0 release notes
 
-Status: release candidate; tag and GitHub release pending.
+Status: approved open-source sandbox release.
 
 `v0.1.0` is the first public sandbox release of Agent Mandate, a task-bound
 authorization gateway for consequential AI-agent actions. It demonstrates that
@@ -25,16 +25,17 @@ downstream credential.
 
 ## Release evidence
 
-- The pre-candidate `main` baseline passed hosted CI with typecheck, 52 tests
-  against PostgreSQL 17 with no skips,
-  production build, Compose deployment, adversarial E2E, downstream outage,
-  database-pause confidence, load, and soak gates. Candidate-specific hosted CI
-  and CodeQL are still required before tagging.
+- Validated implementation base `abfa608e8394b52c5824fe68466ed31920049602` passed
+  [hosted CI](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532638)
+  and [CodeQL](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532631).
+  CI passed typecheck, 52 PostgreSQL-backed tests with no skips, production
+  build, full-history secret scanning, high/critical image scanning, Compose
+  deployment, adversarial E2E, downstream outage, database-pause confidence,
+  bounded load, and the CI-sized soak gate.
 
 See [pilot-evidence.md](pilot-evidence.md) for the machine-observed local details
-and their explicit limits. The exact candidate SHA, hosted run URLs, scan
-results, and artifact digests must be recorded in the release checklist before
-the release status changes from candidate to published.
+and their explicit limits. The exact implementation SHA, hosted run URLs, scan
+results, and artifact digests are recorded in the release checklist.
 
 ## Deliberate limits
 
@@ -51,7 +52,11 @@ It is a source release; the npm package remains intentionally private.
 
 ## Upgrade and compatibility
 
-This is the first tagged contract candidate. Future incompatible changes to
+This is the first tagged contract release. Future incompatible changes to
 mandates, action envelopes, decisions, or receipts require an explicit contract
 version change and updated conformance fixtures. Database migrations must retain
 receipt and audit evidence as described in the deployment runbook.
+
+- Breaking changes: none; this is the first public release.
+- Migration: a fresh sandbox deployment runs the documented up migration. There
+  is no prior public release to upgrade from.

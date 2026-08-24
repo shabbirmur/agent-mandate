@@ -16,9 +16,9 @@ redacted audit events plus an immutable hash-linked receipt-state chain.
 > pilot still requires reviewed provider configuration, managed PostgreSQL/TLS,
 > secret management, deployment approval, and an external security review.
 
-The repository is preparing its first `v0.1.0` open-source sandbox release. The
-release is intended for local evaluation, protocol review, and contributions;
-it is not a production security boundary or a managed service.
+`v0.1.0` is the project's first open-source sandbox release. It is intended for
+local evaluation, protocol review, and contributions; it is not a production
+security boundary or a managed service.
 
 ## Why this exists
 

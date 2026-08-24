@@ -2,7 +2,7 @@
 
 ## Current release status
 
-The `v0.1.0` release candidate completes the executable semantics and local
+The `v0.1.0` sandbox release completes the executable semantics and local
 single-tenant gateway slices, and implements selected ecosystem features such as
 MCP enforcement, RFC 8693 token exchange, OPA boundaries, DPoP hooks, and
 mechanically attenuated delegation. Its providers and payment API remain local
