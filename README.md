@@ -1,10 +1,33 @@
 # Agent Mandate
 
 [![CI](https://github.com/shabbirmur/agent-mandate/actions/workflows/ci.yml/badge.svg)](https://github.com/shabbirmur/agent-mandate/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/shabbirmur/agent-mandate?label=release)](https://github.com/shabbirmur/agent-mandate/releases/tag/v0.1.0)
 
-Task-bound authorization infrastructure for AI agents. This repository contains
-a deployable, single-tenant pilot showing that an agent can perform one
-consequential action without receiving a standing downstream credential.
+## Give agents a mandate, not a master key
+
+Task-bound authorization for AI agents: exact approvals, atomic limits,
+credential isolation, and execution receipts. Agent Mandate lets an agent
+perform one consequential action without receiving a standing downstream
+credential.
+
+**[Run the demo](#run-the-demo)** · **[Become a design partner](https://github.com/shabbirmur/agent-mandate/discussions/new?category=ideas)**
+
+### See the authorization boundary in action
+
+```text
+Approved: payment.create($480 USD, merchant:42, task:pay-42, max calls: 1)
+
+Injected task drift   -> DENY  task_mismatch
+Parameter mutation    -> DENY  approval_mismatch
+Exact approved action -> ALLOW succeeded + hash-linked receipt
+Idempotent replay     -> ALLOW same receipt, no repeated side effect
+Concurrent second use -> DENY  call_limit_exceeded
+```
+
+The runnable sandbox exercises this complete path through the HTTP gateway,
+PostgreSQL enforcement, token exchange, and a local payment provider. It shows
+deterministic authorization enforcement after an agent or its prompt drifts; it
+does not claim to detect prompt injection.
 
 The gateway binds a validated human principal and workload identity to one task,
 audience, action, resource, canonical parameter envelope, expiry, approval, and
@@ -33,7 +56,7 @@ failure modes: exact approval, atomic one-use enforcement, prompt/task drift
 denial, idempotent replay, revocation, ambiguous-timeout reconciliation,
 redacted audit, and hash-linked receipt evidence.
 
-## Run the complete pilot
+## Run the demo
 
 Requirements: Docker Compose v2. The images use Node 26 and PostgreSQL 17.
 
@@ -42,6 +65,11 @@ docker compose build
 docker compose up -d --wait
 npm run test:docker
 ```
+
+On success, the final JSON summary reports `"ok": true`, the allowed receipt
+ID, denial codes for task and approval drift, the ambiguous-timeout outcome,
+one allowed result in the concurrent one-use race, and the recorded audit-event
+count.
 
 The live test obtains separately signed principal and workload tokens, issues an
 exactly approved `payment.create` mandate, denies prompt-injected task drift and
@@ -178,12 +206,18 @@ whether an allowed payment is wise or its source data is true.
 - [Pilot evidence template](docs/pilot-evidence-template.md)
 - [Accelerated delivery plan](docs/accelerated-pilot-plan.md)
 - [Roadmap](docs/roadmap.md)
+- [Launch and design-partner plan](docs/launch-plan.md)
 - [v0.1.0 release notes](docs/release-notes-v0.1.0.md)
 - [Changelog](CHANGELOG.md)
 
 ## Contributing and security
 
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing contracts or behavior.
+- [Become a design partner](https://github.com/shabbirmur/agent-mandate/discussions/new?category=ideas)
+  by describing one consequential agent action you want to protect. Do not
+  include credentials, customer data, or confidential system details.
+- Use [GitHub Discussions](https://github.com/shabbirmur/agent-mandate/discussions)
+  for integration questions, ideas, and implementation feedback.
 - Report vulnerabilities using the private process in [SECURITY.md](SECURITY.md),
   not a public issue.
 - Community participation follows [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
