@@ -27,6 +27,8 @@ No unreleased changes.
 - Apache-2.0 governance files, contribution and security guidance, structured
   issue forms, a release checklist, Dependabot, CodeQL, history secret scanning,
   and high/critical container-CVE scanning.
+- Node 26 Alpine runtime images, `@types/node` 26, TypeScript 7, and the pinned
+  `setup-node` 7 GitHub Action.
 
 ### Security
 

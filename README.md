@@ -35,7 +35,7 @@ redacted audit, and hash-linked receipt evidence.
 
 ## Run the complete pilot
 
-Requirements: Docker Compose v2. The images use Node 22 and PostgreSQL 17.
+Requirements: Docker Compose v2. The images use Node 26 and PostgreSQL 17.
 
 ```bash
 docker compose build

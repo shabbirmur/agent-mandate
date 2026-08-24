@@ -27,7 +27,7 @@ Completing the open-source checklist does not satisfy, waive, or imply any produ
 - [x] Evidence verifies exact approval binding, task/audience/parameter drift denial, atomic one-use enforcement, revocation, idempotent replay, ambiguous timeout handling, HTTP/MCP parity, redaction, tenant isolation, and receipt-chain integrity.
 - [x] Migration up/down, restart, PostgreSQL outage/recovery, and downstream outage/recovery evidence is tied to the implementation SHA and dated environment details.
 - [x] `openapi.yaml`, README, architecture, threat model, deployment runbook, pilot evidence, and known limitations agree with observed behavior.
-- [x] The locally rebuilt `linux/arm64` gateway image embeds `VCS_REF=abfa608e8394b52c5824fe68466ed31920049602` and has digest `sha256:8c07a5dfc0484e96c50b74e2a8d733e50c6aa7a5ff25806ae85572bae0fd2d97`. No registry image or SBOM is published for v0.1.0; source-tag and archive linkage will be verified in the publication section below after publication.
+- [x] The locally rebuilt Node 26 `linux/arm64` gateway image embeds `VCS_REF=c5901de20933238f2f264d26eed231a1c8fb4878` and has digest `sha256:6786252c04899c52f603121057bf90d582835bb9dd105bbfdf81964ae083fa92`. No registry image or SBOM is published for v0.1.0; source-tag and archive linkage will be verified in the publication section below after publication.
 
 ### Publish and verify
 
@@ -43,7 +43,7 @@ Completing the open-source checklist does not satisfy, waive, or imply any produ
 - Validated implementation commit SHA: `abfa608e8394b52c5824fe68466ed31920049602`
 - Final tag-target SHA: recorded in the annotated tag, GitHub release, and post-publication verification record because a tracked file cannot contain its own commit SHA.
 - CI run URL and result: [CI 32515532638](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532638) passed, including 52/52 PostgreSQL-backed tests with no skips; [CodeQL 32515532631](https://github.com/shabbirmur/agent-mandate/actions/runs/32515532631) passed.
-- Evidence report and artifact digests: `docs/pilot-evidence.md`; local `linux/arm64` gateway image `sha256:8c07a5dfc0484e96c50b74e2a8d733e50c6aa7a5ff25806ae85572bae0fd2d97`. Published source-archive checksums will be recorded with the GitHub release and post-publication verification record.
+- Evidence report and artifact digests: `docs/pilot-evidence.md`; local Node 26 `linux/arm64` gateway image `sha256:6786252c04899c52f603121057bf90d582835bb9dd105bbfdf81964ae083fa92`. Published source-archive checksums will be recorded with the GitHub release and post-publication verification record.
 - Known residual risks: local test providers, no managed PostgreSQL failover/restore evidence, no multi-hour soak, external security review, production deployment, KMS/WORM evidence, or pilot-owner acceptance.
 - Decision: `GO` for the open-source sandbox release only.
 - Release approver, date, and planned release URL: Shabbir Murtaza (`@shabbirmur`), 2026-08-24; <https://github.com/shabbirmur/agent-mandate/releases/tag/v0.1.0>.
