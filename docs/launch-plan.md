@@ -63,6 +63,12 @@ Package the same proof as:
 The demo, README, article, launch posts, and outreach must describe the same
 action and evidence.
 
+Implementation update (2026-08-27): the v0.2 branch contains the product
+listener, GitHub App provider, approval UI, MCP tools, multi-client installer,
+Compose profile, architecture diagram, and live proof runner. This is code and
+local-test evidence only; the provider-owned run, recording, independent-user
+runs, and candidate-bound publication evidence remain open.
+
 ## Public storefront
 
 Completed on 2026-08-24:
@@ -149,9 +155,10 @@ artifact. After the GitHub proof works:
 3. Add the required MCP package metadata and `server.json`.
 4. Submit it to the official MCP Registry.
 
-The v0.1.0 package remains intentionally private and has no published registry
-image, so this is a later distribution milestone rather than a current launch
-claim.
+The root service package remains private. A separate `@agent-mandate/cli` v0.2
+package is staged but not published, and there is no published registry image,
+so registry submission remains a later distribution milestone rather than a
+current launch claim.
 
 ## Success measures
 
@@ -188,4 +195,3 @@ production readiness, real-provider acceptance, managed-database failover,
 external security approval, or pilot-owner acceptance. Those remain explicit
 gates and must be verified independently before the corresponding claims are
 made.
-

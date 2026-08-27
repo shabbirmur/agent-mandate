@@ -1,0 +1,32 @@
+{
+  "name": "@agent-mandate/cli",
+  "version": "0.2.0",
+  "description": "Install Agent Mandate into Codex, Claude Code, Cursor, VS Code, and Gemini CLI.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "am": "dist/main.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "homepage": "https://github.com/shabbirmur/agent-mandate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shabbirmur/agent-mandate.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/shabbirmur/agent-mandate/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

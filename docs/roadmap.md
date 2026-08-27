@@ -8,11 +8,12 @@ MCP enforcement, RFC 8693 token exchange, OPA boundaries, DPoP hooks, and
 mechanically attenuated delegation. Its providers and payment API remain local
 sandboxes.
 
-The next product milestone is a public interoperability demo using a real
-provider-owned sandbox: one narrowly approved GitHub issue creation succeeds
-once, a prompt-injected destructive repository action is denied, and both
-produce conformance evidence. That milestone does not change the frozen
-`am.action.v1` contract silently.
+The v0.2 implementation candidate now contains the narrow GitHub issue profile,
+persisted approval flow, product-only MCP/REST listener, safe multi-client CLI,
+Compose profile, and receipt-verifying live proof runner. The next milestone is
+to execute that candidate against a real provider-owned sandbox and produce
+candidate-bound interoperability, performance, outage, and security evidence.
+None of this changes the frozen `am.action.v1` contract silently.
 
 ## Phase 0 — semantics (implemented)
 
@@ -33,10 +34,12 @@ Exit: contributors can debate a running contract instead of a slide deck.
   data adapter.
 - Implemented: HTTP and MCP enforcement points, OpenAPI, Docker Compose, and
   telemetry/redaction defaults.
+- Implemented in the v0.2 candidate: a real GitHub App issue provider with
+  one-repository credential attenuation and bounded reconciliation.
 - Remaining: Cedar, reverse-proxy, and TypeScript SDK adapters.
 
-Remaining exit work: secure a real GitHub or cloud provider-owned sandbox
-workflow without exposing its credential to the agent.
+Remaining exit work: validate the exact candidate in a real GitHub
+provider-owned sandbox without exposing its credential to the agent.
 
 ## Phase 2 — agent ecosystem adapters (partially implemented)
 
@@ -45,8 +48,11 @@ workflow without exposing its credential to the agent.
 - Implemented: generic HTTP execution, RFC 8707 audience binding, RFC 8693
   token exchange, a DPoP proof hook, and mechanically attenuated parent/child
   delegation.
-- Remaining: LangGraph and OpenAI Agents SDK adapters, OAuth protected-resource
-  metadata, an RFC 9396 authorization-detail profile, and mTLS support.
+- Implemented in the v0.2 candidate: four narrow first-party MCP tools, remote
+  HTTP and stdio transports, OAuth protected-resource metadata, and safe
+  installers for Codex, Claude Code, Cursor, VS Code, and Gemini CLI.
+- Remaining: direct LangGraph and OpenAI Agents SDK adapters, an RFC 9396
+  authorization-detail profile, and mTLS support.
 
 Remaining exit work: two independent integrations and a public
 interop/conformance suite.

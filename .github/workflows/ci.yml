@@ -31,6 +31,11 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm run pack:cli
+      - name: Validate product Compose profile
+        run: docker compose -f compose.product.yml config --quiet
+        env:
+          AGENT_MANDATE_ENV_FILE: .env.product.example
       - run: docker compose build
         env:
           VCS_REF: ${{ github.sha }}

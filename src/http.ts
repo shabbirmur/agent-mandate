@@ -30,9 +30,10 @@ export async function readJson<T>(request: IncomingMessage, maximumBytes = MAX_B
 
 export function bearer(request: IncomingMessage, headerName = "authorization"): string {
   const raw = request.headers[headerName];
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  if (!value?.startsWith("Bearer ") || value.length === "Bearer ".length) throw new HttpError(401, "invalid_token");
-  return value.slice("Bearer ".length);
+  if (Array.isArray(raw) || typeof raw !== "string" || raw.length > 128 * 1_024) throw new HttpError(401, "invalid_token");
+  const match = raw.match(/^Bearer ([^\s,]+)$/iu);
+  if (!match) throw new HttpError(401, "invalid_token");
+  return match[1]!;
 }
 
 export function requestUrl(request: IncomingMessage): URL {

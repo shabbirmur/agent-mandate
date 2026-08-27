@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient, type PoolConfig, type QueryResultRow } from "pg";
+import { canonicalHash } from "../canonical.js";
 import type { MandateRepository } from "../ports.js";
 import {
   ACTION_ENVELOPE_VERSION,
@@ -60,6 +61,20 @@ export class PostgresMandateRepository implements MandateRepository {
     if (!Number.isSafeInteger(expiresAt.getTime())) throw new Error("mandate expiry is outside the supported date range");
 
     return this.#transaction(async (client) => {
+      if (request.approvalRequestId !== undefined) {
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+          JSON.stringify([request.tenantId, request.approvalRequestId]),
+        ]);
+        const existing = await client.query<DatabaseRow>(
+          "SELECT * FROM agent_mandates WHERE tenant_id = $1 AND approval_request_id = $2",
+          [request.tenantId, request.approvalRequestId],
+        );
+        if (existing.rows[0] !== undefined) {
+          const mandate = mapMandate(existing.rows[0]);
+          assertIdempotentMandate(mandate, request, grantHash);
+          return mandate;
+        }
+      }
       const id = randomUUID();
       if (request.parentMandateId !== undefined) {
         const parentResult = await client.query<DatabaseRow>(
@@ -84,10 +99,10 @@ export class PostgresMandateRepository implements MandateRepository {
         `INSERT INTO agent_mandates (
            id, tenant_id, principal_id, agent_id, workload_id, task_id,
            audience, actions, resources, expires_in_seconds, constraints_json,
-           approval_json, parent_mandate_id, grant_hash, issued_at, expires_at
+           approval_json, parent_mandate_id, approval_request_id, grant_hash, issued_at, expires_at
          ) VALUES (
            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-           $11::jsonb, $12::jsonb, $13, $14, $15, $16
+           $11::jsonb, $12::jsonb, $13, $14, $15, $16, $17
          )
          RETURNING *`,
         [
@@ -104,6 +119,7 @@ export class PostgresMandateRepository implements MandateRepository {
           request.constraints === undefined ? null : JSON.stringify(request.constraints),
           request.approval === undefined ? null : JSON.stringify(request.approval),
           request.parentMandateId ?? null,
+          request.approvalRequestId ?? null,
           grantHash,
           issuedAt,
           expiresAt,
@@ -243,6 +259,26 @@ export class PostgresMandateRepository implements MandateRepository {
           ...remainingCalls(mandate, delegatedCalls),
         };
         return { decision, mandate, receipt: existing, replay: true };
+      }
+
+      if (mandate.approvalRequestId !== undefined) {
+        const approvalResult = await client.query<DatabaseRow>(
+          `SELECT approval.*, connection.status AS connection_status,
+                  resource.status AS resource_status
+           FROM approval_requests AS approval
+           JOIN provider_connections AS connection
+             ON connection.tenant_id = approval.tenant_id
+            AND connection.id = approval.provider_connection_id
+           JOIN provider_connection_resources AS resource
+             ON resource.tenant_id = approval.tenant_id
+            AND resource.connection_id = approval.provider_connection_id
+            AND resource.provider_resource_id = approval.provider_resource_id
+           WHERE approval.tenant_id = $1 AND approval.id = $2
+           FOR SHARE OF approval, connection, resource`,
+          [mandate.tenantId, mandate.approvalRequestId],
+        );
+        const approvalCode = productApprovalCode(approvalResult.rows[0], mandate, request, envelopeHash, at);
+        if (approvalCode !== "allowed") return deny(approvalCode);
       }
 
       if (mandate.status !== "active") return deny("revoked");
@@ -561,6 +597,45 @@ export class PostgresMandateRepository implements MandateRepository {
   }
 }
 
+function productApprovalCode(
+  row: DatabaseRow | undefined,
+  mandate: Mandate,
+  request: ActionRequest,
+  envelopeHash: string,
+  now: Date,
+): "allowed" | ErrorCode {
+  const evidence = mandate.approval;
+  if (row === undefined || evidence === undefined || evidence.required !== true) return "approval_mismatch";
+  if (requiredString(row.status, "approval_requests.status") !== "approved") return "approval_mismatch";
+  if (now.getTime() >= Date.parse(dateIso(row.expires_at, "approval_requests.expires_at"))) return "expired";
+  if (
+    requiredString(row.connection_status, "provider_connections.status") !== "active" ||
+    requiredString(row.resource_status, "provider_connection_resources.status") !== "active"
+  ) return "revoked";
+  const intent = parseJsonObject(row.intent_json, "approval_requests.intent_json");
+  const matches =
+    requiredString(row.id, "approval_requests.id") === mandate.approvalRequestId &&
+    optionalString(row.mandate_id, "approval_requests.mandate_id") === mandate.id &&
+    requiredString(row.tenant_id, "approval_requests.tenant_id") === mandate.tenantId &&
+    requiredString(row.expected_principal_id, "approval_requests.expected_principal_id") === mandate.principalId &&
+    requiredString(row.agent_id, "approval_requests.agent_id") === mandate.agentId &&
+    requiredString(row.workload_id, "approval_requests.workload_id") === mandate.workloadId &&
+    requiredString(row.workflow_id, "approval_requests.workflow_id") === mandate.taskId &&
+    requiredSha256(row.envelope_hash, "approval_requests.envelope_hash") === envelopeHash &&
+    requiredSha256(row.intent_hash, "approval_requests.intent_hash") === evidence.intentHash &&
+    intent !== undefined && canonicalHash(intent) === evidence.intentHash &&
+    requiredString(row.idempotency_key, "approval_requests.idempotency_key") === request.idempotencyKey &&
+    requiredString(row.profile_id, "approval_requests.profile_id") === evidence.profileId &&
+    requiredSha256(row.profile_hash, "approval_requests.profile_hash") === evidence.profileHash &&
+    requiredString(row.provider_id, "approval_requests.provider_id") === evidence.providerId &&
+    requiredString(row.provider_connection_id, "approval_requests.provider_connection_id") === evidence.providerConnectionId &&
+    requiredString(row.provider_resource_id, "approval_requests.provider_resource_id") === evidence.providerResourceId &&
+    evidence.approvalRequestId === mandate.approvalRequestId &&
+    evidence.envelopeHash === envelopeHash &&
+    evidence.approvedBy === mandate.principalId;
+  return matches ? "allowed" : "approval_mismatch";
+}
+
 function parseGrant(grant: string): { mandateId: string; secret: string } | undefined {
   const separator = grant.indexOf(".");
   if (separator <= 0 || separator !== grant.lastIndexOf(".") || separator === grant.length - 1) return undefined;
@@ -581,7 +656,30 @@ function validateMandateRequest(request: MandateRequest): void {
   }
   if (request.constraints !== undefined) validateConstraints(request.constraints, "constraints");
   if (request.approval !== undefined) validateApproval(request.approval, "approval");
+  if (request.approvalRequestId !== undefined) requireNonEmpty(request.approvalRequestId, "approvalRequestId");
+  if (request.approvalRequestId !== undefined && request.approval?.approvalRequestId !== request.approvalRequestId) {
+    throw new Error("approvalRequestId must match approval evidence");
+  }
   if (request.parentMandateId !== undefined) requireNonEmpty(request.parentMandateId, "parentMandateId");
+}
+
+function assertIdempotentMandate(mandate: Mandate, request: MandateRequest, grantHash: string): void {
+  const same =
+    mandate.grantHash === grantHash &&
+    mandate.tenantId === request.tenantId &&
+    mandate.principalId === request.principalId &&
+    mandate.agentId === request.agentId &&
+    mandate.workloadId === request.workloadId &&
+    mandate.taskId === request.taskId &&
+    mandate.audience === request.audience &&
+    (request.approvalRequestId !== undefined || mandate.expiresInSeconds === request.expiresInSeconds) &&
+    mandate.parentMandateId === request.parentMandateId &&
+    mandate.approvalRequestId === request.approvalRequestId &&
+    jsonEquals(toJsonValue(mandate.actions, "mandate.actions"), toJsonValue(request.actions, "request.actions")) &&
+    jsonEquals(toJsonValue(mandate.resources, "mandate.resources"), toJsonValue(request.resources, "request.resources")) &&
+    jsonEquals(toJsonValue(mandate.constraints ?? null, "mandate.constraints"), toJsonValue(request.constraints ?? null, "request.constraints")) &&
+    jsonEquals(toJsonValue(mandate.approval ?? null, "mandate.approval"), toJsonValue(request.approval ?? null, "request.approval"));
+  if (!same) throw new Error("approval_request_mandate_conflict");
 }
 
 function validateReservationInput(request: ActionRequest, envelopeHash: string, decisionId: string): void {
@@ -850,6 +948,7 @@ function mapMandate(row: DatabaseRow): Mandate {
   const constraints = parseConstraints(row.constraints_json, "agent_mandates.constraints_json");
   const approval = parseApproval(row.approval_json, "agent_mandates.approval_json");
   const parentMandateId = optionalString(row.parent_mandate_id, "agent_mandates.parent_mandate_id");
+  const approvalRequestId = optionalString(row.approval_request_id, "agent_mandates.approval_request_id");
   return {
     id: requiredString(row.id, "agent_mandates.id"),
     tenantId: requiredString(row.tenant_id, "agent_mandates.tenant_id"),
@@ -863,6 +962,7 @@ function mapMandate(row: DatabaseRow): Mandate {
     expiresInSeconds: requiredInteger(row.expires_in_seconds, "agent_mandates.expires_in_seconds"),
     ...(constraints === undefined ? {} : { constraints }),
     ...(approval === undefined ? {} : { approval }),
+    ...(approvalRequestId === undefined ? {} : { approvalRequestId }),
     ...(parentMandateId === undefined ? {} : { parentMandateId }),
     grantHash: requiredSha256(row.grant_hash, "agent_mandates.grant_hash"),
     issuedAt: dateIso(row.issued_at, "agent_mandates.issued_at"),
@@ -989,16 +1089,45 @@ function parseConstraints(value: unknown, label: string): ConstraintSet | undefi
 function parseApproval(value: unknown, label: string): ApprovalEvidence | undefined {
   const object = parseJsonObject(value, label);
   if (object === undefined) return undefined;
-  assertKnownKeys(object, new Set(["required", "approvedBy", "approvedAt", "envelopeHash"]), label);
+  assertKnownKeys(object, new Set([
+    "required",
+    "approvedBy",
+    "approvedAt",
+    "envelopeHash",
+    "approvalRequestId",
+    "intentHash",
+    "profileId",
+    "profileHash",
+    "providerId",
+    "providerConnectionId",
+    "providerResourceId",
+    "authenticatedAt",
+  ]), label);
   if (typeof object.required !== "boolean") throw new Error(`${label}.required must be boolean`);
   const approvedBy = optionalString(object.approvedBy ?? null, `${label}.approvedBy`);
   const approvedAt = optionalString(object.approvedAt ?? null, `${label}.approvedAt`);
   const envelopeHash = optionalString(object.envelopeHash ?? null, `${label}.envelopeHash`);
+  const approvalRequestId = optionalString(object.approvalRequestId ?? null, `${label}.approvalRequestId`);
+  const intentHash = optionalString(object.intentHash ?? null, `${label}.intentHash`);
+  const profileId = optionalString(object.profileId ?? null, `${label}.profileId`);
+  const profileHash = optionalString(object.profileHash ?? null, `${label}.profileHash`);
+  const providerId = optionalString(object.providerId ?? null, `${label}.providerId`);
+  const providerConnectionId = optionalString(object.providerConnectionId ?? null, `${label}.providerConnectionId`);
+  const providerResourceId = optionalString(object.providerResourceId ?? null, `${label}.providerResourceId`);
+  const authenticatedAt = optionalString(object.authenticatedAt ?? null, `${label}.authenticatedAt`);
   return {
     required: object.required,
     ...(approvedBy === undefined ? {} : { approvedBy }),
     ...(approvedAt === undefined ? {} : { approvedAt }),
     ...(envelopeHash === undefined ? {} : { envelopeHash }),
+    ...(approvalRequestId === undefined ? {} : { approvalRequestId }),
+    ...(intentHash === undefined ? {} : { intentHash }),
+    ...(profileId === undefined ? {} : { profileId }),
+    ...(profileHash === undefined ? {} : { profileHash }),
+    ...(providerId === undefined ? {} : { providerId }),
+    ...(providerConnectionId === undefined ? {} : { providerConnectionId }),
+    ...(providerResourceId === undefined ? {} : { providerResourceId }),
+    ...(authenticatedAt === undefined ? {} : { authenticatedAt }),
   };
 }
 
@@ -1014,7 +1143,27 @@ function validateApproval(value: ApprovalEvidence, label: string): void {
   if (parsed?.envelopeHash !== undefined && !isSha256Base64Url(parsed.envelopeHash)) {
     throw new Error(`${label}.envelopeHash must be a base64url-encoded SHA-256 digest`);
   }
+  if (parsed?.intentHash !== undefined && !isSha256Base64Url(parsed.intentHash)) {
+    throw new Error(`${label}.intentHash must be a base64url-encoded SHA-256 digest`);
+  }
+  if (parsed?.profileHash !== undefined && !isSha256Base64Url(parsed.profileHash)) {
+    throw new Error(`${label}.profileHash must be a base64url-encoded SHA-256 digest`);
+  }
   if (parsed?.approvedAt !== undefined) validDate(new Date(parsed.approvedAt), `${label}.approvedAt`);
+  if (parsed?.authenticatedAt !== undefined) validDate(new Date(parsed.authenticatedAt), `${label}.authenticatedAt`);
+  if (parsed?.approvalRequestId !== undefined) {
+    for (const [name, field] of Object.entries({
+      intentHash: parsed.intentHash,
+      profileId: parsed.profileId,
+      profileHash: parsed.profileHash,
+      providerId: parsed.providerId,
+      providerConnectionId: parsed.providerConnectionId,
+      providerResourceId: parsed.providerResourceId,
+      authenticatedAt: parsed.authenticatedAt,
+    })) {
+      if (field === undefined) throw new Error(`${label}.${name} is required for product approval evidence`);
+    }
+  }
 }
 
 function parseJsonObject(value: unknown, label: string): Record<string, JsonValue> | undefined {

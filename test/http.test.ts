@@ -14,6 +14,21 @@ test("accepts bounded JSON and extracts bearer tokens", async () => {
   const input = request('{"ok":true}');
   assert.deepEqual(await readJson(input), { ok: true });
   assert.equal(bearer(input), "token-1");
+  input.headers.authorization = "bearer token-2";
+  assert.equal(bearer(input), "token-2");
+});
+
+test("rejects ambiguous, whitespace-bearing, and oversized bearer headers", () => {
+  const input = request("{}");
+  for (const authorization of [
+    ["Bearer one", "Bearer two"],
+    "Bearer one two",
+    "Bearer one,two",
+    `Bearer ${"x".repeat(128 * 1_024)}`,
+  ]) {
+    input.headers.authorization = authorization;
+    assert.throws(() => bearer(input), (error: unknown) => error instanceof HttpError && error.status === 401);
+  }
 });
 
 test("rejects wrong content type and oversized payloads", async () => {

@@ -55,9 +55,27 @@ export function evaluateLocalPolicy(input: PolicyInput): PolicyResult {
     if (mandate.approval.approvedBy !== mandate.principalId) return deny("approval_mismatch");
     parseTimestamp(mandate.approval.approvedAt);
     if (mandate.approval.envelopeHash !== canonicalHash(envelope)) return deny("approval_mismatch");
+    if (mandate.approvalRequestId !== undefined) {
+      const product = mandate.approval;
+      if (
+        product.approvalRequestId !== mandate.approvalRequestId ||
+        !product.approvedAt ||
+        !product.intentHash || !digest(product.intentHash) ||
+        !product.profileId || !product.profileHash || !digest(product.profileHash) ||
+        !product.providerId || !product.providerConnectionId || !product.providerResourceId ||
+        !product.authenticatedAt
+      ) return deny("approval_mismatch");
+      const authenticatedAt = parseTimestamp(product.authenticatedAt);
+      const approvedAt = parseTimestamp(product.approvedAt);
+      if (authenticatedAt > approvedAt) return deny("approval_mismatch");
+    }
   }
 
   return { outcome: "allow" };
+}
+
+function digest(value: string): boolean {
+  return /^[A-Za-z0-9_-]{43}$/.test(value);
 }
 
 function parseTimestamp(value: string): number {

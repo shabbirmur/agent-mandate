@@ -1,0 +1,393 @@
+openapi: 3.1.0
+info:
+  title: Agent Mandate Product API
+  version: 0.2.0-candidate
+  description: >-
+    Product-only API for one exact GitHub issue action. Trusted identity,
+    provider connection, repository ID, profile, action, and idempotency values
+    are derived by the service and are not accepted from request bodies.
+servers:
+  - url: http://127.0.0.1:8787
+    description: Explicit loopback evaluation profile
+tags:
+  - name: Operations
+  - name: GitHub issue workflow
+paths:
+  /healthz:
+    get:
+      tags: [Operations]
+      operationId: health
+      responses:
+        "200":
+          description: Process is live.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Probe"
+  /readyz:
+    get:
+      tags: [Operations]
+      operationId: readiness
+      responses:
+        "200":
+          description: PostgreSQL-backed repositories are ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Probe"
+        "503":
+          description: A required repository is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Probe"
+  /v1/product/github/issues/proposals:
+    post:
+      tags: [GitHub issue workflow]
+      operationId: proposeGitHubIssue
+      security:
+        - productAccess: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubIssueProposal"
+      responses:
+        "202":
+          description: Immutable approval request created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalRequired"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/product/approvals/{requestId}:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
+    get:
+      tags: [GitHub issue workflow]
+      operationId: getApprovalStatus
+      security:
+        - productAccess: []
+      responses:
+        "200":
+          description: Context-bound approval and execution projection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /v1/product/approvals/resume:
+    post:
+      tags: [GitHub issue workflow]
+      operationId: resumeApproval
+      description: >-
+        Executes only the stored envelope. No provider arguments are accepted.
+        Clients must not blindly retry a lost response.
+      security:
+        - productAccess: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [resumeHandle]
+              properties:
+                resumeHandle:
+                  $ref: "#/components/schemas/OpaqueHandle"
+      responses:
+        "200":
+          description: Current terminal or non-terminal execution result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResumeResult"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          description: Execution outcome requires status/receipt inspection; do not blind-retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/product/approvals/{requestId}/receipt:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
+    get:
+      tags: [GitHub issue workflow]
+      operationId: getExecutionReceipt
+      security:
+        - productAccess: []
+      responses:
+        "200":
+          description: Context-bound receipt and receipt-chain verification result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  securitySchemes:
+    productAccess:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        OAuth access token with scope agent-mandate:use. Obtain it through the
+        authorization server advertised by /.well-known/oauth-protected-resource/mcp.
+  parameters:
+    RequestId:
+      name: requestId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+  responses:
+    InvalidRequest:
+      description: Body is malformed or contains an untrusted authority field.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing or invalid product access token.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Configured provider connection is unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource or context-bound request is unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Frozen approval, profile, resource, or receipt binding conflict.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Probe:
+      type: object
+      additionalProperties: false
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: string
+          pattern: "^[a-z][a-z0-9._-]*$"
+    OpaqueHandle:
+      type: string
+      description: Secret workflow handle returned once by proposal and submitted only to resume.
+      pattern: "^[A-Za-z0-9_-]{43}$"
+    Digest:
+      type: string
+      pattern: "^[A-Za-z0-9_-]{43}$"
+    GitHubIssueProposal:
+      type: object
+      additionalProperties: false
+      required: [repository, title]
+      properties:
+        repository:
+          type: string
+          pattern: "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 256
+        body:
+          type: string
+          maxLength: 65000
+    ApprovalRequired:
+      type: object
+      additionalProperties: false
+      required: [status, requestId, resumeHandle, approvalUrl, expiresAt, intentHash]
+      properties:
+        status:
+          const: approval_required
+        requestId:
+          type: string
+        resumeHandle:
+          $ref: "#/components/schemas/OpaqueHandle"
+        approvalUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+        intentHash:
+          $ref: "#/components/schemas/Digest"
+    ApprovalStatus:
+      type: object
+      additionalProperties: false
+      required: [requestId, status, executionStatus, profileId, providerId, repository, action, parameters, expiresAt]
+      properties:
+        requestId:
+          type: string
+        status:
+          enum: [pending, approved, denied, expired, cancelled]
+        executionStatus:
+          enum: [not_started, reserved, dispatching, succeeded, failed, ambiguous]
+        profileId:
+          const: github.issue.create.v1
+        providerId:
+          const: github
+        repository:
+          type: string
+        action:
+          const: github.issue.create.v1
+        parameters:
+          type: object
+          additionalProperties: true
+        expiresAt:
+          type: string
+          format: date-time
+        decisionReason:
+          type: string
+        receiptId:
+          type: string
+    ResumeResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [status, requestId, expiresAt]
+          properties:
+            status:
+              enum: [pending, denied, expired, cancelled]
+            requestId:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+            reason:
+              type: string
+        - type: object
+          additionalProperties: false
+          required: [status, requestId, expiresAt, reason]
+          properties:
+            status:
+              enum: [failed, ambiguous]
+            requestId:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+            reason:
+              type: string
+        - type: object
+          additionalProperties: false
+          required: [status, requestId, execution]
+          properties:
+            status:
+              enum: [succeeded, failed, ambiguous]
+            requestId:
+              type: string
+            execution:
+              $ref: "#/components/schemas/Execution"
+    Execution:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: object
+          additionalProperties: true
+        receipt:
+          $ref: "#/components/schemas/ExecutionReceipt"
+        result:
+          type: object
+          additionalProperties: false
+          required: [status, body]
+          properties:
+            status:
+              type: integer
+              minimum: 100
+              maximum: 599
+            body:
+              type: object
+              additionalProperties: true
+    ExecutionReceipt:
+      type: object
+      additionalProperties: true
+      required: [id, mandateId, outcome, receiptHash, attemptCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        mandateId:
+          type: string
+        outcome:
+          enum: [pending, succeeded, failed, ambiguous]
+        receiptHash:
+          $ref: "#/components/schemas/Digest"
+        previousReceiptHash:
+          $ref: "#/components/schemas/Digest"
+        attemptCount:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReceiptResult:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [status, requestId]
+          properties:
+            status:
+              const: not_available
+            requestId:
+              type: string
+        - type: object
+          additionalProperties: false
+          required: [status, requestId, receipt, chainVerified]
+          properties:
+            status:
+              const: available
+            requestId:
+              type: string
+            receipt:
+              $ref: "#/components/schemas/ExecutionReceipt"
+            chainVerified:
+              type: boolean
