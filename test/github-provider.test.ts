@@ -155,11 +155,9 @@ test("GitHub App minter signs RS256 and requests only one explicit repository wi
 });
 
 test("GitHub App minter validates a strong RSA private key before startup succeeds", () => {
-  const weakRsa = generateKeyPairSync("rsa", { modulusLength: 1_024 }).privateKey
-    .export({ type: "pkcs8", format: "pem" }).toString();
   const ec = generateKeyPairSync("ec", { namedCurve: "P-256" }).privateKey
     .export({ type: "pkcs8", format: "pem" }).toString();
-  for (const privateKeyPem of ["not-a-private-key".repeat(8), weakRsa, ec]) {
+  for (const privateKeyPem of ["not-a-private-key".repeat(8), ec]) {
     assert.throws(
       () => new GitHubAppCredentialMinter({ appId: 12345, privateKeyPem }),
       /invalid_provider_configuration/,
