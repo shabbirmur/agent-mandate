@@ -1,6 +1,6 @@
 {
   "name": "agent-mandate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Task-bound authorization broker for AI agents",
   "license": "Apache-2.0",
@@ -13,12 +13,20 @@
     "url": "https://github.com/shabbirmur/agent-mandate/issues"
   },
   "type": "module",
+  "bin": {
+    "am": "dist/cli/main.js"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:product": "tsx watch src/product-server.ts",
     "build": "tsc -p tsconfig.json",
+    "build:cli": "tsc -p packages/cli/tsconfig.json",
     "migrate": "node dist/storage/migrations.js up",
     "migrate:down": "node dist/storage/migrations.js down",
     "start": "node dist/server.js",
+    "start:product": "node dist/product-server.js",
+    "pack:cli": "npm run build:cli && npm pack ./packages/cli --dry-run",
+    "demo:github": "node scripts/github-demo.mjs",
     "test": "node --import tsx --test test/*.test.ts",
     "test:docker": "node test/docker-e2e.mjs",
     "test:confidence": "node test/docker-confidence.mjs",
@@ -37,7 +45,10 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "jose": "^6.2.9",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "zod": "^4.4.3"
   }
 }

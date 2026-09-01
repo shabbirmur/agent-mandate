@@ -10,38 +10,36 @@ credential isolation, and execution receipts. Agent Mandate lets an agent
 perform one consequential action without receiving a standing downstream
 credential.
 
-**[Run the demo](#run-the-demo)** · **[Become a design partner](https://github.com/shabbirmur/agent-mandate/discussions/new?category=ideas)**
+**[Run the demo](#protect-a-real-github-action)** · **[Become a design partner](docs/design-partners.md)**
 
 ### See the authorization boundary in action
 
 ```text
-Approved: payment.create($480 USD, merchant:42, task:pay-42, max calls: 1)
-
-Injected task drift   -> DENY  task_mismatch
-Parameter mutation    -> DENY  approval_mismatch
-Exact approved action -> ALLOW succeeded + hash-linked receipt
-Idempotent replay     -> ALLOW same receipt, no repeated side effect
-Concurrent second use -> DENY  call_limit_exceeded
+Agent proposes: create issue #1 in owner/sandbox with this exact title and body
+User approves:  immutable action envelope in a separate browser session
+Agent resumes:  GitHub App token minted for one repository, Issues:write only
+Exact action:   succeeds once and returns a hash-linked execution receipt
+Injected drift: repository-delete fields are rejected before an approval exists
+Replay:         returns the recorded outcome without repeating the side effect
 ```
 
-The runnable sandbox exercises this complete path through the HTTP gateway,
-PostgreSQL enforcement, token exchange, and a local payment provider. It shows
-deterministic authorization enforcement after an agent or its prompt drifts; it
-does not claim to detect prompt injection.
+Agent Mandate does not claim to detect or eliminate prompt injection. It makes
+post-injection authority drift deterministic: an agent can only execute the
+stored action a separately authenticated user approved.
 
 The gateway binds a validated human principal and workload identity to one task,
 audience, action, resource, canonical parameter envelope, expiry, approval, and
 use budget. PostgreSQL atomically enforces use/revocation/idempotency and stores
 redacted audit events plus an immutable hash-linked receipt-state chain.
 
-> Pilot status: suitable for a controlled sandbox evaluation, not production.
-> The checked-in identity and payment services are local test providers. A real
-> pilot still requires reviewed provider configuration, managed PostgreSQL/TLS,
-> secret management, deployment approval, and an external security review.
+> Product status: `v0.2` is an unreleased implementation candidate for controlled
+> GitHub sandbox evaluations, not a production claim. Live GitHub evidence,
+> hosted deployment, managed PostgreSQL/failover testing, client interoperability,
+> external security review, and pilot-owner acceptance remain release gates.
 
-`v0.1.0` is the project's first open-source sandbox release. It is intended for
-local evaluation, protocol review, and contributions; it is not a production
-security boundary or a managed service.
+`v0.1.0` remains the released local payment sandbox. The v0.2 product listener
+is deliberately separate: it exposes four narrow MCP tools and no generic
+downstream proxy or raw mandate-issuance route.
 
 ## Why this exists
 
@@ -51,12 +49,54 @@ revocable object bound to a principal, workload, task, audience, action,
 resource, parameters, expiry, approval, and use budget. The downstream
 credential is exchanged inside the gateway and never returned to the agent.
 
-The `v0.1.0` sandbox demonstrates the narrow consequential-action path and its
-failure modes: exact approval, atomic one-use enforcement, prompt/task drift
-denial, idempotent replay, revocation, ambiguous-timeout reconciliation,
-redacted audit, and hash-linked receipt evidence.
+The `v0.1.0` sandbox demonstrates the authorization core and its failure modes.
+The v0.2 candidate adds the first real provider profile: one exact GitHub issue,
+one separately authenticated approval, one selected repository, one atomic use,
+and one verifiable receipt chain.
 
-## Run the demo
+## Protect a real GitHub action
+
+The release target is one client-side command:
+
+```bash
+npx -y @agent-mandate/cli@0.2.0 protect github \
+  --endpoint https://mandate.example.com/mcp
+```
+
+The package and hosted endpoint are not published yet. From this branch, build
+the exact same CLI locally and point it at a configured product service:
+
+```bash
+npm ci
+npm run build:cli
+node packages/cli/dist/main.js protect github \
+  --endpoint https://mandate.example.com/mcp
+```
+
+The installer auto-detects Codex, Claude Code, Cursor, VS Code, and Gemini CLI,
+adds only the secret-free MCP URL, and starts browser OAuth where the client
+supports it. Select clients explicitly with `--clients`; inspect changes first
+with `--dry-run`; use `am doctor` to distinguish a mediated route from a
+deployment where direct GitHub credentials and egress have actually been
+removed.
+
+For the self-hosted product service, GitHub App, OIDC claim contract, and live
+proof command, follow [the v0.2 quickstart](docs/product-quickstart.md). The live
+script first proves an injected repository-delete request is denied, then waits
+for approval, executes the exact issue creation once, and verifies its receipt
+chain:
+
+```bash
+AGENT_MANDATE_URL=http://127.0.0.1:8787 \
+AGENT_MANDATE_ACCESS_TOKEN='short-lived-oauth-access-token' \
+GITHUB_REPOSITORY=owner/sandbox npm run demo:github
+```
+
+The access token is read from the environment for this operator-run proof and is
+never printed. Agent clients use OAuth discovery at `/mcp`; do not put bearer or
+GitHub tokens in MCP configuration.
+
+## Run the v0.1 sandbox demo
 
 Requirements: Docker Compose v2. The images use Node 26 and PostgreSQL 17.
 
@@ -201,6 +241,11 @@ whether an allowed payment is wise or its source data is true.
 ## Operations and design
 
 - [Architecture and frozen contract](docs/architecture.md)
+- [v0.2 product contract](docs/v0.2-product-contract.md)
+- [v0.2 self-hosted quickstart](docs/product-quickstart.md)
+- [v0.2 product REST contract](openapi-product.yaml)
+- [Why OAuth identity is not enough to authorize agent intent](docs/why-oauth-identity-is-not-agent-intent.md)
+- [Design-partner program](docs/design-partners.md)
 - [Threat model](docs/threat-model.md)
 - [Deployment, rotation, rollback, recovery, and incidents](docs/deployment-runbook.md)
 - [Pilot evidence template](docs/pilot-evidence-template.md)
@@ -213,7 +258,7 @@ whether an allowed payment is wise or its source data is true.
 ## Contributing and security
 
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing contracts or behavior.
-- [Become a design partner](https://github.com/shabbirmur/agent-mandate/discussions/new?category=ideas)
+- [Become a design partner](docs/design-partners.md)
   by describing one consequential agent action you want to protect. Do not
   include credentials, customer data, or confidential system details.
 - Use [GitHub Discussions](https://github.com/shabbirmur/agent-mandate/discussions)
@@ -226,6 +271,6 @@ whether an allowed payment is wise or its source data is true.
 
 Apache-2.0
 
-`v0.1.0` is distributed as source and local container definitions. The package
-is intentionally marked private; no npm package publication is planned for this
-release.
+`v0.1.0` is distributed as source and local container definitions. The root
+service package remains private. `@agent-mandate/cli` is staged separately for a
+future v0.2 npm publication only after the candidate gates are complete.

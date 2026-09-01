@@ -1,0 +1,49 @@
+x-product-build: &product-build
+  context: .
+  args:
+    VCS_REF: ${VCS_REF:-local}
+
+services:
+  product-postgres:
+    image: postgres:17-alpine@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
+    environment:
+      POSTGRES_DB: agent_mandate
+      POSTGRES_USER: mandate
+      POSTGRES_PASSWORD: local-product-postgres-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mandate -d agent_mandate"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    volumes:
+      - product-db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  product-gateway:
+    build: *product-build
+    init: true
+    command: ["sh", "-c", "node dist/storage/migrations.js up && node dist/product-server.js"]
+    env_file:
+      - ${AGENT_MANDATE_ENV_FILE:-.env.product}
+    environment:
+      PORT: "8787"
+      PRODUCT_BIND_HOST: "0.0.0.0"
+      DATABASE_URL: postgres://mandate:local-product-postgres-only@product-postgres:5432/agent_mandate
+    depends_on:
+      product-postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8787:8787"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8787/readyz"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  product-db:

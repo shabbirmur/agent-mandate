@@ -23,6 +23,32 @@ export interface MandateServiceOptions {
   highRiskActions?: readonly string[];
 }
 
+/** Trusted control-plane input. This type is never accepted from the public mandate endpoint. */
+export interface ApprovedMandateInput {
+  approvalRequestId: string;
+  agentId: string;
+  workloadId: string;
+  taskId: string;
+  audience: string;
+  action: string;
+  resource: string;
+  expiresInSeconds: number;
+  approval: Required<Pick<ApprovalEvidence,
+    | "required"
+    | "approvedBy"
+    | "approvedAt"
+    | "envelopeHash"
+    | "approvalRequestId"
+    | "intentHash"
+    | "profileId"
+    | "profileHash"
+    | "providerId"
+    | "providerConnectionId"
+    | "providerResourceId"
+    | "authenticatedAt"
+  >>;
+}
+
 export class MandateServiceError extends Error {
   readonly code: ErrorCode;
 
@@ -82,6 +108,36 @@ export class MandateService {
     return { mandate: publicMandate, grant: `${mandate.id}.${secret}` };
   }
 
+  /**
+   * Idempotently provisions a one-use mandate for a persisted browser approval.
+   * The caller must be trusted control-plane code and must never return the grant
+   * outside the service boundary.
+   */
+  async issueApproved(principal: PrincipalContext, input: ApprovedMandateInput, secret: string): Promise<IssuedMandate> {
+    validatePrincipal(principal);
+    validateApprovedMandateInput(principal, input, secret);
+    const now = this.#validNow();
+    const request: MandateRequest = {
+      tenantId: principal.tenantId,
+      principalId: principal.principalId,
+      agentId: input.agentId,
+      workloadId: input.workloadId,
+      taskId: input.taskId,
+      audience: input.audience,
+      actions: [input.action],
+      resources: [input.resource],
+      expiresInSeconds: input.expiresInSeconds,
+      constraints: { maxCalls: 1 },
+      approval: structuredClone(input.approval),
+      approvalRequestId: input.approvalRequestId,
+    };
+    const grantHash = hashGrantSecret(secret);
+    const mandate = await this.#repository.create(request, grantHash, now);
+    assertCreatedMandate(mandate, request, grantHash);
+    const { grantHash: _storedHash, ...publicMandate } = structuredClone(mandate);
+    return { mandate: publicMandate, grant: `${mandate.id}.${secret}` };
+  }
+
   async revoke(principal: PrincipalContext, mandateId: string): Promise<boolean> {
     validatePrincipal(principal);
     requireNonEmptyString(mandateId);
@@ -94,6 +150,48 @@ export class MandateService {
     const now = this.#now();
     if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new TypeError("now must return a valid Date");
     return new Date(now.getTime());
+  }
+}
+
+function validateApprovedMandateInput(principal: PrincipalContext, input: ApprovedMandateInput, secret: string): void {
+  for (const value of [
+    input.approvalRequestId,
+    input.agentId,
+    input.workloadId,
+    input.taskId,
+    input.audience,
+    input.action,
+    input.resource,
+    input.approval.approvedBy,
+    input.approval.approvedAt,
+    input.approval.envelopeHash,
+    input.approval.intentHash,
+    input.approval.profileId,
+    input.approval.profileHash,
+    input.approval.providerId,
+    input.approval.providerConnectionId,
+    input.approval.providerResourceId,
+    input.approval.authenticatedAt,
+  ]) requireNonEmptyString(value);
+  if (
+    input.approval.required !== true ||
+    input.approval.approvalRequestId !== input.approvalRequestId ||
+    input.approval.approvedBy !== principal.principalId
+  ) throw new MandateServiceError("approval_mismatch");
+  if (!Number.isInteger(input.expiresInSeconds) || input.expiresInSeconds < 1 || input.expiresInSeconds > MAX_MANDATE_TTL_SECONDS) {
+    throw new MandateServiceError("invalid_request");
+  }
+  if (!isNonEmptyString(secret) || secret.includes(".") || Buffer.byteLength(secret, "utf8") < 32) {
+    throw new MandateServiceError("invalid_request");
+  }
+  for (const [value, label] of [
+    [input.approval.approvedAt, "approvedAt"],
+    [input.approval.authenticatedAt, "authenticatedAt"],
+  ] as const) {
+    if (!Number.isFinite(Date.parse(value))) throw new MandateServiceError("invalid_request", { cause: new Error(`${label} is invalid`) });
+  }
+  for (const digest of [input.approval.envelopeHash, input.approval.intentHash, input.approval.profileHash]) {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(digest)) throw new MandateServiceError("approval_mismatch");
   }
 }
 

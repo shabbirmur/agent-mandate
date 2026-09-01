@@ -8,6 +8,7 @@ import {
   sha256Base64Url,
   verifyGrantSecret,
 } from "../src/storage/integrity.js";
+import { revertMigrations } from "../src/storage/migrations.js";
 import { postgresTest } from "./support/postgres.js";
 
 const NOW = new Date("2026-08-21T00:00:00.000Z");
@@ -102,8 +103,7 @@ test("grant and receipt integrity hashes are deterministic and domain shaped", (
 });
 
 postgresTest("migrations are reversible only while evidence tables are empty", async ({ pool }) => {
-  const down = await readFile(new URL("../migrations/001_pilot_storage.down.sql", import.meta.url), "utf8");
-  await pool.query(down);
+  await revertMigrations(pool);
   const remaining = await pool.query(
     "SELECT to_regclass('agent_mandates') AS mandates, to_regclass('audit_events') AS audit",
   );

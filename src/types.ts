@@ -43,6 +43,8 @@ export interface PrincipalContext {
   subject: string;
   /** Present when the relying party required a nonce for this authentication. */
   nonce?: string;
+  /** OIDC auth_time, when asserted by the verified identity token. */
+  authenticatedAt?: string;
 }
 
 export interface WorkloadContext {
@@ -80,6 +82,112 @@ export interface ApprovalEvidence {
   approvedBy?: string;
   approvedAt?: string;
   envelopeHash?: string;
+  /** v0.2 product approval binding. Older v0.1 records omit these fields. */
+  approvalRequestId?: string;
+  intentHash?: string;
+  profileId?: string;
+  profileHash?: string;
+  providerId?: string;
+  providerConnectionId?: string;
+  providerResourceId?: string;
+  authenticatedAt?: string;
+}
+
+export const APPROVAL_INTENT_VERSION = "am.approval-intent.v1" as const;
+export type ApprovalIntentVersion = typeof APPROVAL_INTENT_VERSION;
+export type ActionRisk = "read" | "write" | "consequential" | "prohibited";
+export type ApprovalRequestStatus = "pending" | "approved" | "denied" | "expired" | "cancelled";
+export type ApprovalExecutionStatus = "not_started" | "reserved" | "dispatching" | "succeeded" | "failed" | "ambiguous";
+
+/** Immutable terms shown to, and later approved by, a separately authenticated user. */
+export interface ApprovalIntent {
+  version: ApprovalIntentVersion;
+  requestId: string;
+  envelope: ActionEnvelope;
+  envelopeHash: string;
+  profileId: string;
+  profileHash: string;
+  providerId: string;
+  providerConnectionId: string;
+  providerResourceId: string;
+  /** Server/profile-minted provider correlation key; never model supplied. */
+  idempotencyKey: string;
+  risk: ActionRisk;
+  expiresAt: string;
+  maxCalls: number;
+  delegationAllowed: false;
+  expectedApprover: string;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  tenantId: string;
+  expectedPrincipalId: string;
+  agentId: string;
+  workloadId: string;
+  workflowId: string;
+  mcpSessionHash: string;
+  profileId: string;
+  profileHash: string;
+  providerId: string;
+  providerConnectionId: string;
+  providerResourceId: string;
+  envelope: ActionEnvelope;
+  envelopeHash: string;
+  intent: ApprovalIntent;
+  intentHash: string;
+  resumeHandleHash: string;
+  idempotencyKey: string;
+  status: ApprovalRequestStatus;
+  executionStatus: ApprovalExecutionStatus;
+  createdAt: string;
+  expiresAt: string;
+  decidedAt?: string;
+  decidedBy?: string;
+  authenticatedAt?: string;
+  decisionReason?: string;
+  mandateId?: string;
+  receiptId?: string;
+}
+
+export interface ApprovalEvent {
+  id: string;
+  tenantId: string;
+  requestId: string;
+  sequence: number;
+  type: "requested" | "approved" | "denied" | "expired" | "cancelled" | "execution.updated";
+  at: string;
+  principalId?: string;
+  intentHash: string;
+  snapshot: ApprovalRequest;
+}
+
+export type ProviderConnectionStatus = "active" | "suspended" | "revoked";
+export type ProviderResourceStatus = "active" | "removed";
+
+export interface ProviderConnection {
+  id: string;
+  tenantId: string;
+  providerId: string;
+  externalAccountId: string;
+  displayName: string;
+  /** Reference into the deployment secret store; never a provider credential. */
+  secretRef: string;
+  metadata: Record<string, JsonValue>;
+  status: ProviderConnectionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProviderConnectionResource {
+  tenantId: string;
+  connectionId: string;
+  providerResourceId: string;
+  displayName: string;
+  selector: Record<string, JsonValue>;
+  status: ProviderResourceStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Internal request. tenantId and principalId must come from PrincipalContext. */
@@ -95,6 +203,8 @@ export interface MandateRequest {
   expiresInSeconds: number;
   constraints?: ConstraintSet;
   approval?: ApprovalEvidence;
+  /** Server-owned idempotency link for a separately approved product request. */
+  approvalRequestId?: string;
   parentMandateId?: string;
 }
 

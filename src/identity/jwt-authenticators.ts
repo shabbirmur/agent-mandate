@@ -64,6 +64,7 @@ export class OidcPrincipalAuthenticator implements PrincipalAuthenticator {
 
       const payload = await verify(token, this.#config, [this.#tenantIdClaim, this.#principalIdClaim]);
       const nonce = optionalStringClaim(payload, "nonce", failureCode);
+      const authenticatedAt = optionalNumericDateClaim(payload, "auth_time", failureCode);
       if (expectedNonce !== undefined && nonce !== expectedNonce) throw new IdentityAuthenticationError(failureCode);
 
       return {
@@ -72,6 +73,7 @@ export class OidcPrincipalAuthenticator implements PrincipalAuthenticator {
         issuer: requiredStringClaim(payload, "iss", failureCode),
         subject: requiredStringClaim(payload, "sub", failureCode),
         ...(nonce !== undefined ? { nonce } : {}),
+        ...(authenticatedAt !== undefined ? { authenticatedAt } : {}),
       };
     } catch (error) {
       if (error instanceof IdentityAuthenticationError) throw error;
@@ -190,6 +192,17 @@ function optionalStringClaim(payload: JWTPayload, name: string, code: ErrorCode)
     throw new IdentityAuthenticationError(asIdentityCode(code));
   }
   return value;
+}
+
+function optionalNumericDateClaim(payload: JWTPayload, name: string, code: ErrorCode): string | undefined {
+  const value = payload[name];
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw new IdentityAuthenticationError(asIdentityCode(code));
+  }
+  const date = new Date(value * 1_000);
+  if (!Number.isFinite(date.getTime())) throw new IdentityAuthenticationError(asIdentityCode(code));
+  return date.toISOString();
 }
 
 function asIdentityCode(code: ErrorCode): IdentityAuthenticationError["code"] {
